@@ -6,9 +6,10 @@ CPP=g++
 #LIBPATH = $(PWD)/linux_ftdi/x86_64
 #INCPATH = $(PWD)/linux_ftdi
 LIBPATH = $(PWD)/lftdi136/build
-INCPATH = $(PWD)/lftdi136
+INCPATH = $(PWD)/lftdi136 
 
 CFLAGS += -I$(INCPATH)
+CFLAGS += -I$(PWD)/../common
 CFLAGS += -DX64 -O3
 CFLAGS += -fPIC -Wall
 
