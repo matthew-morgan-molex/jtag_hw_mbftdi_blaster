@@ -633,16 +633,17 @@ int ftdi_blaster::configureMpsse()
     unsigned int dwClockDivisor = 29; // Value of clock divisor, SCL Frequency = 60/((1+vl)*2) (MHz)
     FT_STATUS ftStatus;
 
-// -----------------------------------------------------------
-// Synchronize the MPSSE by sending a bogus opcode (0xAA),
-// The MPSSE will respond with "Bad Command" (0xFA) followed by
-// the bogus opcode itself.
-// -----------------------------------------------------------
-// Reset output buffer pointer
+    // -----------------------------------------------------------
+    // Synchronize the MPSSE by sending a bogus opcode (0xAA),
+    // The MPSSE will respond with "Bad Command" (0xFA) followed by
+    // the bogus opcode itself.
+    // -----------------------------------------------------------
+    // Reset output buffer pointer
     dwNumBytesToSend=0;
-//Add bogus command ‘xAA’ to the queue
+
+    //Add bogus comman 0xAA to the queue
     byOutputBuffer[dwNumBytesToSend++] = 0xAA;
-// Send off the BAD commands
+    // Send off the BAD commands
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
     do
     {
@@ -650,10 +651,10 @@ int ftdi_blaster::configureMpsse()
         ftStatus = g_pGetQueueStatus(ftHandle_, &dwNumBytesToRead);
     } while ((dwNumBytesToRead == 0) && (ftStatus == FT_OK));
 
-//Read out the data from input buffer
+    //Read out the data from input buffer
     ftStatus = g_pRead(ftHandle_, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
 
-//Check if Bad command and echo command received
+    //Check if Bad command and echo command received
     bCommandEchod = false;
     for (dwCount = 0; dwCount < dwNumBytesRead - 1; dwCount++)
     {
@@ -671,83 +672,83 @@ int ftdi_blaster::configureMpsse()
         return -1; // Exit with error
     }
 
-// -----------------------------------------------------------
-// Configure the MPSSE settings for JTAG
-// Multiple commands can be sent to the MPSSE with one FT_Write
-// -----------------------------------------------------------
+    // -----------------------------------------------------------
+    // Configure the MPSSE settings for JTAG
+    // Multiple commands can be sent to the MPSSE with one FT_Write
+    // -----------------------------------------------------------
+    
+    // Set up the Hi-Speed specific commands for the FTx232H
 
-// Set up the Hi-Speed specific commands for the FTx232H
-
-// Start with a fresh index
+    // Start with a fresh index
     dwNumBytesToSend = 0;
 
-// Use 60MHz master clock (disable divide by 5)
+    // Use 60MHz master clock (disable divide by 5)
     byOutputBuffer[dwNumBytesToSend++] = 0x8A;
-// Turn off adaptive clocking (may be needed for ARM)
+    // Turn off adaptive clocking (may be needed for ARM)
     byOutputBuffer[dwNumBytesToSend++] = 0x97;
-// Disable three-phase clocking
+    // Disable three-phase clocking
     byOutputBuffer[dwNumBytesToSend++] = 0x8D;
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
 
-// Send off the HS-specific commands
+    // Send off the HS-specific commands
 
     dwNumBytesToSend = 0;
-// Set initial states of the MPSSE interface - low byte, both pin directions and output values
-// Pin name Signal Direction Config Initial State Config
-// ADBUS0 TCK output 1 low 0
-// ADBUS1 TDI output 1 low 0
-// ADBUS2 TDO input 0 0
-// ADBUS3 TMS output 1 high 1
-// ADBUS4 GPIOL0 input 0 0
-// ADBUS5 GPIOL1 input 0 0
-// ADBUS6 GPIOL2 input 0 0
-// ADBUS7 GPIOL3 input 0 0
-// Set data bits low-byte of MPSSE port
+    // Set initial states of the MPSSE interface - low byte, both pin directions and output values
+    // Pin name Signal Direction Config Initial State Config
+    // ADBUS0 TCK output 1 low 0
+    // ADBUS1 TDI output 1 low 0
+    // ADBUS2 TDO input 0 0
+    // ADBUS3 TMS output 1 high 1
+    // ADBUS4 GPIOL0 input 0 0
+    // ADBUS5 GPIOL1 input 0 0
+    // ADBUS6 GPIOL2 input 0 0
+    // ADBUS7 GPIOL3 input 0 0
+    // Set data bits low-byte of MPSSE port
     byOutputBuffer[dwNumBytesToSend++] = 0x80;
-// Initial state config above
+    // Initial state config above
     byOutputBuffer[dwNumBytesToSend++] = 0x08;
-// Direction config above
+    // Direction config above
     byOutputBuffer[dwNumBytesToSend++] = 0x0B;
-// Send off the low GPIO config commands
+    // Send off the low GPIO config commands
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
 
     dwNumBytesToSend = 0;
-// Set initial states of the MPSSE interface - high byte, both pin directions and output values
-// Pin name Signal Direction Config Initial State Config
-// ACBUS0 GPIOH0 input 0 0
-// ACBUS1 GPIOH1 input 0 0
-// ACBUS2 GPIOH2 input 0 0
-// ACBUS3 GPIOH3 input 0 0
-// ACBUS4 GPIOH4 input 0 0
-// ACBUS5 GPIOH5 input 0 0
-// ACBUS6 GPIOH6 input 0 0
-// ACBUS7 GPIOH7 input 0 0
-// Set data bits low-byte of MPSSE port
+    // Set initial states of the MPSSE interface - high byte, both pin directions and output values
+    // Pin name Signal Direction Config Initial State Config
+    // ACBUS0 GPIOH0 input 0 0
+    // ACBUS1 GPIOH1 input 0 0
+    // ACBUS2 GPIOH2 input 0 0
+    // ACBUS3 GPIOH3 input 0 0
+    // ACBUS4 GPIOH4 input 0 0
+    // ACBUS5 GPIOH5 input 0 0
+    // ACBUS6 GPIOH6 input 0 0
+    // ACBUS7 GPIOH7 input 0 0
+    // Set data bits low-byte of MPSSE port
     byOutputBuffer[dwNumBytesToSend++] = 0x82;
-// Initial state config above
+    // Initial state config above
     byOutputBuffer[dwNumBytesToSend++] = 0x0;
-// Direction config above
+    // Direction config above
     byOutputBuffer[dwNumBytesToSend++] = 0x0;
-// Send off the high GPIO config commands
+    // Send off the high GPIO config commands
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
 
     dwNumBytesToSend = 0;
-// Set TCK frequency
-// TCK = 60MHz /((1 + [(1 +0xValueH*256) OR 0xValueL])*2)
-//Command to set clock divisor
+    // Set TCK frequency
+    // TCK = 60MHz /((1 + [(1 +0xValueH*256) OR 0xValueL])*2)
+    // Command to set clock divisor
     byOutputBuffer[dwNumBytesToSend++] = 0x86;
-//Set 0xValueL of clock divisor
+    // Set 0xValueL of clock divisor
     byOutputBuffer[dwNumBytesToSend++] = dwClockDivisor & 0xFF;
-//Set 0xValueH of clock divisor
+    // Set 0xValueH of clock divisor
     byOutputBuffer[dwNumBytesToSend++] = (dwClockDivisor >> 8) & 0xFF;
-// Send off the clock divisor commands
+    // Send off the clock divisor commands
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
 
     dwNumBytesToSend = 0;
-// Disable internal loop-back
-// Disable loopback
+    // Disable internal loop-back
+    // Disable loopback
     byOutputBuffer[dwNumBytesToSend++] = 0x85;
-// Send off the loopback command
+    // Send off the loopback command
     ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
 
     return ftStatus;

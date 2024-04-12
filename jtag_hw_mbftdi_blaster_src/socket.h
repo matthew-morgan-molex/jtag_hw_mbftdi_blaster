@@ -22,24 +22,24 @@ using namespace std;
 class CSocket
 {
 public:
-	int recvData(char* recv_buffer, int length);
-	int sendData(char* send_buffer, int length);
-	unsigned long hasReadData();
-	int sendReq(list<string>ipservers, unsigned short port, char* send_buffer, int length);
-	int sendBroadcastReq(unsigned short port, char* send_buffer, int length);
-	int recvDgram(char* recv_buffer, int buffer_length, struct sockaddr* addr);
-	bool connectTcp(sockaddr* addr);
-	void disconnectTcp();
-	CSocket( bool Udp );
-	virtual ~CSocket();
+    int recvData(char* recv_buffer, int length);
+    int sendData(char* send_buffer, int length);
+    unsigned long hasReadData();
+    int sendReq(list<string>ipservers, unsigned short port, char* send_buffer, int length);
+    int sendBroadcastReq(unsigned short port, char* send_buffer, int length);
+    int recvDgram(char* recv_buffer, int buffer_length, struct sockaddr* addr);
+    bool connectTcp(sockaddr* addr);
+    void disconnectTcp();
+    CSocket( bool Udp );
+    virtual ~CSocket();
 private:
-	int error_ { 0 };
-	bool udp_{ false };
+    int error_ { 0 };
+    bool udp_{ false };
 #ifdef NET_DEBUG
-	void dump(char* str, unsigned char* buf, int len);
+    void dump(char* str, unsigned char* buf, int len);
 #endif
-	SOCKET_TYPE socket_;
-	static bool WSAStarted;
-	mutex mutex_net_;
+    SOCKET_TYPE socket_;
+    static bool WSAStarted;
+    mutex mutex_net_;
 };
 
