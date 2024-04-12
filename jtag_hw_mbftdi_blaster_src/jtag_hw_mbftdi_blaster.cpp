@@ -20,9 +20,9 @@ void do_sleep(int ms) { Sleep(ms);  }
 void do_sleep(int ms) { usleep(ms*1000); }
 #endif
 
-#include "../common/debug.h"
-#include "../common/jtagsrv.h"
-#include "config.h"
+#include "debug.h"
+#include "jtagsrv.h"
+#include "CConfig.h"
 #include "jtag_hw_mbftdi_blaster.h"
 
 int  g_cfg_channel = 0;
@@ -347,7 +347,8 @@ int accept_channel(char* pdescription, int maxlen)
         }
     }
 
-    if (g_cfg_channel_set) {
+    if (g_cfg_channel_set)
+    {
         //use configuration for channel selection
         if (g_cfg_channel == 0 && channel == 'A')
             return 1;
@@ -358,7 +359,8 @@ int accept_channel(char* pdescription, int maxlen)
         if (g_cfg_channel == 3 && channel == 'D')
             return 1;
     }
-    else {
+    else
+    {
         //check channel
         if (USE_CHANNEL_A && channel == 'A')
             return 1;
@@ -378,7 +380,7 @@ int accept_description(char* pdescription, int maxlen)
         int i;
         char need_descr[] = { NEED_DESCRIPTION };
 
-        for (i = 0; i<maxlen; i++)
+        for (i = 0; i < maxlen; i++)
         {
             if (need_descr[i] == 0)
                 return 1;
@@ -477,8 +479,8 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
     unsigned int myNumDevs = 0;
     FT_STATUS ftStatus;
 
-// Does an FTDI device exist?
-// Get the number of FTDI devices
+    // Does an FTDI device exist?
+    // Get the number of FTDI devices
     printd("Checking for FTDI devices...\n");
     ftStatus = g_pCreateDeviceInfoList(&dwNumDevs);
 
@@ -494,13 +496,13 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
         return -1; // Exist with error
     }
 
-//limit number of devices
+    //limit number of devices
     if(dwNumDevs > NUM_NODES-1)
         dwNumDevs = NUM_NODES-1;
 
     memset(g_device_node,0,sizeof(g_device_node));
     ftStatus = g_pGetDeviceInfoList(&g_device_node[0],&dwNumDevs);
-    for(i=0; i<dwNumDevs; i++)
+    for(i = 0; i < dwNumDevs; i++)
     {
         printd(">%d %08X %08X %08X **%s**%s**\n",
                g_device_node[i].Flags,
@@ -510,14 +512,13 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
                g_device_node[i].SerialNumber,
                g_device_node[i].Description);
 
-        if(
-            ((g_device_node[i].ID == VIDPID_FT2232) || (g_device_node[i].ID == VIDPID_FT4232)) &&
-            accept_serialno(g_device_node[i].SerialNumber,sizeof(g_device_node[i].SerialNumber)) &&
-            accept_description(g_device_node[i].Description,sizeof(g_device_node[i].Description)) &&
-            accept_channel(g_device_node[i].Description,sizeof(g_device_node[i].Description))
-            )
+        if (((g_device_node[i].ID == VIDPID_FT2232) || (g_device_node[i].ID == VIDPID_FT4232)) &&
+            accept_serialno(g_device_node[i].SerialNumber, sizeof(g_device_node[i].SerialNumber)) &&
+            accept_description(g_device_node[i].Description, sizeof(g_device_node[i].Description)) &&
+            accept_channel(g_device_node[i].Description, sizeof(g_device_node[i].Description)))
+        {
             myNumDevs++;
-
+        }
         char myblastername[] = DEV_NAME;
         memcpy(pblaster_name, myblastername, sizeof(myblastername));
         pblaster_name[DEV_NAME_SUFF_OFFSET] += (char)port_num;
@@ -584,7 +585,7 @@ FT_STATUS ftdi_blaster::resetDevice()
     return ftStatus;
 }
 
-void ftdi_blaster::set_freq( float freq )
+void ftdi_blaster::set_freq( unsigned int freq )
 {
     unsigned int clk_div;
     float freq_achived;
@@ -594,12 +595,12 @@ void ftdi_blaster::set_freq( float freq )
     //FT_STATUS ftStatus;
 
     //iterate to find proper clock divider
-    for(clk_div=0; clk_div<0x10000; clk_div++)
+    for (clk_div = 0; clk_div < 0x10000; clk_div++)
     {
         freq_achived = (float)30000000/(float)(clk_div+1);
-        if(freq_achived<=freq)
+        if(freq_achived <= (float)freq)
         {
-            printd("Frequency is set to %eHz (FTDI clk divider %04X), requred %eHz\n",freq_achived,clk_div,freq);
+            printd("Frequency is set to %f Hz (FTDI clk divider %04X), required %d Hz\n", freq_achived, clk_div, freq);
 
             //Command to set clock divisor
             byOutputBuffer[dwNumBytesToSend++] = 0x86;
@@ -787,6 +788,16 @@ unsigned int ftdi_blaster::read_pass_jtagsrv(unsigned int num_bytes, unsigned ch
     return FT_OK;
 }
 
+unsigned int ftdi_blaster::set_config_value(char* key, unsigned int value)
+{
+    return g_cfg.set_value(std::string(key), value);
+}
+
+unsigned int ftdi_blaster::get_config_value(char* key, unsigned int* value)
+{
+    return g_cfg.get_value(std::string(key), value);
+}
+
 jblaster* CreateBlaster(int idx)
 {
     ftdi_blaster* pblaster = new ftdi_blaster(idx);
@@ -799,15 +810,15 @@ int ftdi_blaster::configure()
     int status = resetDevice();
     do_sleep(10);
     status = configureMpsse();
-    if(status!=FT_OK) {
+    if(status != FT_OK) {
         printd("cannot configure MPSSE\n");
         return 0;
     }
-    float freq = 10000000;
-    if (g_cfg_frequency_set)
+    unsigned int freq;
+    if (g_cfg.get_value("JtagClock", &freq) == 0)
     {
-        if (g_cfg_frequency >= 1000 && g_cfg_frequency <= 30000000)
-            freq = (float)g_cfg_frequency;
+        if ((freq < 1000) || (freq > 30000000))
+            freq = 10000000;
     }
     set_freq(freq);
     return r;

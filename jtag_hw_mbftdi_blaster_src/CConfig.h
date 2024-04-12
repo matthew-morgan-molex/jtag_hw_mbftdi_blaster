@@ -5,19 +5,18 @@
 #include <list>
 #include <map>
 
-using namespace std;
-
-#include "../common/debug.h"
+#include "debug.h"
 
 class CConfig
 {
 public:
-	CConfig();
-	~CConfig();
-	list<string> getIpServers();
+    CConfig();
+    ~CConfig();
+    std::list<std::string> getIpServers();
+    unsigned int set_value(std::string key, unsigned int value);
+    unsigned int get_value(std::string key, unsigned int* value);
 private:
-	const int MAX_PARAM_NUM = 128;
-	map<string, string> par_val_;
+    std::map<std::string, unsigned int> m_parameter_value;
 };
 
 extern CConfig g_cfg;

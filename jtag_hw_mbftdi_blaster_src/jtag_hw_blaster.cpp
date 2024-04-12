@@ -15,7 +15,6 @@
 
 #include "debug.h"
 #include "jtagsrv.h"
-#include "config.h"
 #include "CConfig.h"
 #include "jtag_hw_blaster.h"
 
@@ -169,7 +168,7 @@ unsigned int jblaster::send_recv(unsigned int need_rdata)
 unsigned int jblaster::printTdiTms(const unsigned char* buf, int num_bits)
 {
     unsigned char dbg[16];
-    unsigned char c;
+    unsigned char c = 0;
     memset(dbg, 0, sizeof(dbg));
     int num = min(num_bits,64);
     for (int i = 0; i < num; i++) {
@@ -253,7 +252,8 @@ int hwproc_open_init(
     jblaster* pblaster = g_pblaster[dev_idx] = CreateBlaster(dev_idx);
     if (pblaster == nullptr)
         return 0;
-        
+    printd("pblaster context = %p\n", pblaster);
+    
     status = pblaster->configure();
     if ( status==0 ) {
         printd("cannot configure MPSSE %d %s\n", dev_idx, pdevname);
@@ -282,10 +282,47 @@ unsigned int hwproc_close(unsigned int* pmycontext)
     return 0;
 }
 
-unsigned int hwproc_unkn2(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
+unsigned int hwproc_set_param(void* context, char* key, unsigned int value)
+{
+    jblaster* pblaster = (jblaster*)context;
+    unsigned int r = 0;
+    printd("hwproc_set_param (%p) %s=%d\n", context, key, value);
+    r = pblaster->set_config_value(key, value);
+    return r;
+}
+
+unsigned int hwproc_get_param(void* context, char* key, unsigned int* value)
+{
+    jblaster* pblaster = (jblaster*)context;
+    unsigned int r = 0;
+    printd("hwproc_get_param (%p) %s\n", context, key);
+    r = pblaster->get_config_value(key, value);
+    return r;
+}
+
+unsigned int hwproc_unkn00(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
 {
     int r = 0;
-    printd("hwproc_unkn2 %p %08X %08X %08X %08X\n", a, b, c, d, e);
+    printd("hwproc_unkn00 %p %08X %08X %08X %08X\n", a, b, c, d, e);
+    return r;
+}
+unsigned int hwproc_unkn01(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
+{
+    int r = 0;
+    printd("hwproc_unkn01 %p %08X %08X %08X %08X\n", a, b, c, d, e);
+    return r;
+}
+unsigned int hwproc_unkn03(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
+{
+    int r = 0;
+    printd("hwproc_unkn03 %p %08X %08X %08X %08X\n", a, b, c, d, e);
+    return r;
+}
+
+unsigned int hwproc_unkn11(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
+{
+    int r=0;
+    printd("hwproc_unkn11 %p %08X %08X %08X %08X\n",a,b,c,d,e);
     return r;
 }
 
@@ -307,12 +344,6 @@ unsigned int hwproc_write_flags_read_status(void* context, unsigned int flags, u
     return 0;
 }
 
-unsigned int hwproc_unkn11(void* a, unsigned int b, unsigned int c, unsigned int d, unsigned int e)
-{
-    int r=0;
-    printd("hwproc_unkn11 %p %08X %08X %08X %08X\n",a,b,c,d,e);
-    return r;
-}
 
 unsigned int hwproc_write_pattern(void* context, unsigned int tms, unsigned int tdi, unsigned int count, unsigned int idx)
 {
@@ -332,7 +363,9 @@ unsigned int hwproc_write_masked(void* context, unsigned int tms, unsigned int* 
 
 void init_my_hw_descr()
 {
-    memset((void*)&hw_descriptor_my,0,sizeof(struct hw_descriptor));
+    printd("init_my_hw_descr: %p\n", &hw_descriptor_my);
+
+    memset((void*)&hw_descriptor_my, 0, sizeof(struct hw_descriptor));
     hw_descriptor_my.size = sizeof(hw_descriptor_my);
 #ifdef _WINDOWS
     strncpy_s((char*)&hw_descriptor_my.hw_name[0], sizeof(hw_descriptor_my.hw_name),GetBlasterName(),sizeof(hw_descriptor_my.hw_name));
@@ -343,13 +376,17 @@ void init_my_hw_descr()
     hw_descriptor_my._hwproc_listdev  = (pfunc_listdev)hwproc_listdev;
     hw_descriptor_my._hwproc_open_init = (pfunc_open_init)hwproc_open_init;
     hw_descriptor_my._hwproc_close = (pfunc_close)hwproc_close;
+    hw_descriptor_my._hwproc_set_param = (pfunc_set_param)hwproc_set_param;
+    hw_descriptor_my._hwproc_get_param = (pfunc_get_param)hwproc_get_param;
+    hw_descriptor_my._hwproc_write_flags_read_status = (pfunc_write_flags_read_status)hwproc_write_flags_read_status;
     hw_descriptor_my._hwproc_write_pattern = (pfunc_write_pattern)hwproc_write_pattern;
     hw_descriptor_my._hwproc_write_masked = (pfunc_write_masked)hwproc_write_masked;
     hw_descriptor_my._hwproc_send_recv = (pfunc_send_recv)hwproc_send_recv;
-    hw_descriptor_my._hwproc_write_flags_read_status = (pfunc_write_flags_read_status)hwproc_write_flags_read_status;
 
-    hw_descriptor_my._unkn2 = (FUNCx)hwproc_unkn2;
-    //hw_descriptor_my.func11 = (FUNCx)hwproc_unkn11;
+    hw_descriptor_my.func00 = (FUNCx)hwproc_unkn00;
+    hw_descriptor_my.func01 = (FUNCx)hwproc_unkn01;
+    hw_descriptor_my.func03 = (FUNCx)hwproc_unkn03;
+    hw_descriptor_my.func11 = (FUNCx)hwproc_unkn11;
 }
 
 extern "C" 

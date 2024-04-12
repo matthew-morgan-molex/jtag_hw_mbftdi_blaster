@@ -30,7 +30,8 @@ using namespace std;
 #define TDI_BIT 1
 #define TMS_BIT 2
 
-struct jtag_task {
+struct jtag_task
+{
     unsigned int need_tdo;
     unsigned int buf_size;
     unsigned int wr_idx;
@@ -45,6 +46,8 @@ public:
     unsigned int write_masked(char tms, uint32_t* ptdibitarray, unsigned int count, unsigned int idx);
     unsigned int send_recv(unsigned int need_rdata);
     virtual unsigned int write_flags_read_status(unsigned int flags, unsigned int* pstatus) { return 0; };
+    virtual unsigned int set_config_value(char* key, unsigned int value) { return 1; };
+    virtual unsigned int get_config_value(char* key, unsigned int* value) { return 1; };
     virtual int configure() { return 1; };
     void*  jtagsrv_context_{ nullptr };
     unsigned int checkSum(const unsigned char* buf, int num_bits);

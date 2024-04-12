@@ -11,11 +11,11 @@
 #ifdef _WINDOWS
 #define LOG_FILE_NAME "d:\\common\\jtag\\jtag_hw_logfile.txt"
 #else
-#define LOG_FILE_NAME "/home/nick/jtag_logfile.txt"
+#define LOG_FILE_NAME "/home/mmorgan01/jtag_logfile.txt"
 #endif
 
 #if DBGPRINT
-
+#if 0
 int slen(char* msg)
 {
 	int i = 0;
@@ -62,6 +62,22 @@ void __cdecl printd_(const char *format, ...)
 	//std::cout << buf;
 #endif
 }
+#else
+std::mutex g_dbg_mutex;
 
+void __cdecl printd_(const char *format, ...)
+{
+    va_list args;
+
+    std::lock_guard<std::mutex> lock(g_dbg_mutex);
+
+    FILE * pLogFile = nullptr;
+    pLogFile = fopen( LOG_FILE_NAME, "ab");
+    va_start(args, format);
+    vfprintf(pLogFile, format, args);
+    va_end(args);
+    fclose(pLogFile);
+}
+#endif
 #endif
 

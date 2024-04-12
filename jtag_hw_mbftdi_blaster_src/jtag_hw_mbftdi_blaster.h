@@ -5,8 +5,6 @@
 #include <mutex>
 #include "jtag_hw_blaster.h"
 
-using namespace std;
-
 /* define JTAG programmer properties */
 #define PROGRAMER_NAME "MBFTDI-Blaster v2.1b"
 
@@ -53,11 +51,13 @@ public:
 	~ftdi_blaster();
 	unsigned int write_flags_read_status(unsigned int flags, unsigned int* pstatus);
 	unsigned int read_pass_jtagsrv(unsigned int num_bytes, unsigned char* rbufn);
+        unsigned int set_config_value(char* key, unsigned int value);
+        unsigned int get_config_value(char* key, unsigned int* value);
 	int configure();
 private:
 	FT_STATUS resetDevice();
 	int configureMpsse();
-	void set_freq(float freq);
+	void set_freq(unsigned int freq);
 	FT_STATUS wait_answer(unsigned int expect_num_bytes);
 
 	unsigned int write_read_as_buffer(unsigned int wr_len, unsigned int rd_len, unsigned int bitsidx, unsigned int need_read);
