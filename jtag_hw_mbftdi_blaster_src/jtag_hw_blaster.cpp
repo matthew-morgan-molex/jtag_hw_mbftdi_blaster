@@ -21,7 +21,7 @@
 struct jtagsrv_interface jtagsrvi;
 jblaster* g_pblaster[MAX_DEV_NUM];
 
-jblaster::jblaster( int idx ):dev_idx_(idx)
+jblaster::jblaster( int idx ):m_dev_idx(idx)
 {
 };
 
@@ -31,61 +31,66 @@ jblaster::~jblaster()
 
 void jblaster::allocJtagTask(unsigned int count, unsigned int need_tdo)
 {
-    int buf_size = max((int)count + MIN_TASK_BUF_SIZE/2, MIN_TASK_BUF_SIZE);
+    int buf_size = std::max((int)count + MIN_TASK_BUF_SIZE/2, MIN_TASK_BUF_SIZE);
     int jtask_mem_size = sizeof(struct jtag_task) + buf_size;
-    jtask_ = (struct jtag_task*)new char[jtask_mem_size];
-    jtask_->buf_size = buf_size;
-    jtask_->need_tdo = need_tdo;
-    jtask_->wr_idx = 0;
-    //printd("alloc jtask count %d need tdo %d sz %d", count, need_tdo, buf_size);
+    m_jtask = (struct jtag_task*)new char[jtask_mem_size];
+    m_jtask->buf_size = buf_size;
+    m_jtask->need_tdo = need_tdo;
+    m_jtask->wr_idx = 0;
 }
 
 void jblaster::reallocJtagTask( unsigned int count )
 {
-    int new_buf_size = jtask_->buf_size + max((int)count + MIN_TASK_BUF_SIZE / 2, MIN_TASK_BUF_SIZE);
+    int new_buf_size = m_jtask->buf_size + std::max((int)count + MIN_TASK_BUF_SIZE / 2, MIN_TASK_BUF_SIZE);
     int jtask_mem_size = sizeof(struct jtag_task) + new_buf_size;
     struct jtag_task* jt = (struct jtag_task*)new char[jtask_mem_size];
     jt->buf_size = new_buf_size;
-    jt->need_tdo = jtask_->need_tdo;
-    jt->wr_idx = jtask_->wr_idx;
-    memcpy(jt->data, jtask_->data, jtask_->wr_idx);
-    char* ptr = (char*)jtask_;
-    delete[]ptr;
-    jtask_ = jt;
-    //printd("realloc jtask count %d need tdo %d sz %d", count, jt->need_tdo, jt->buf_size);
+    jt->need_tdo = m_jtask->need_tdo;
+    jt->wr_idx = m_jtask->wr_idx;
+    memcpy(jt->data, m_jtask->data, m_jtask->wr_idx);
+    char* ptr = (char*)m_jtask;
+    delete [] ptr;
+    m_jtask = jt;
 }
 
 void jblaster::checkJtagTask( unsigned int count, unsigned int idx )
 {
     unsigned int need_tdo = 0;
-    if (jtagsrvi.jtagsrv_get_bits_attr) {
-        uint32_t r = jtagsrvi.jtagsrv_get_bits_attr((void*)jtagsrv_context_, idx);
+    if (jtagsrvi.jtagsrv_get_bits_attr)
+    {
+        uint32_t r = jtagsrvi.jtagsrv_get_bits_attr((void*)m_jtagsrv_context, idx);
         if ((r & 0x80000000) == 0)
             need_tdo = 1;
     }
 
-    if (jtask_) {
+    if (m_jtask)
+    {
         //jtask already started
         //is task of same type?
-        if (jtask_->need_tdo == need_tdo) {
+        if (m_jtask->need_tdo == need_tdo)
+        {
             //same type task, but has space enough?
-            unsigned int space = jtask_->buf_size - jtask_->wr_idx;
-            if (space < count) {
+            unsigned int space = m_jtask->buf_size - m_jtask->wr_idx;
+            if (space < count)
+            {
                 //need more space
                 reallocJtagTask(count);
             }
-            else {
+            else
+            {
                 //continue existing jtask..
             }
         }
-        else {
+        else
+        {
             //another type of task, so put existing task into queue
-            jtag_queue_.push_back(jtask_);
+            m_jtag_queue.push_back(m_jtask);
             //start new task of new current type
             allocJtagTask(count, need_tdo);
         }
     }
-    else {
+    else
+    {
         //no jtask yet, so create it!
         allocJtagTask(count, need_tdo);
     }
@@ -93,22 +98,22 @@ void jblaster::checkJtagTask( unsigned int count, unsigned int idx )
 
 void jblaster::write_pattern(char tms, char tdi, unsigned int count, unsigned int idx)
 {
-    //printd("\nwrite_pattern: %d %d %d\n", tms, count, idx);
     checkJtagTask( count, idx );
     char c=0;
     if (tms) c |= TMS_BIT;
     if (tdi) c |= TDI_BIT;
-    for (unsigned int i = 0; i<count; i++) {
-        jtask_->data[jtask_->wr_idx++] = c;
+    for (unsigned int i = 0; i < count; i++)
+    {
+        m_jtask->data[m_jtask->wr_idx++] = c;
     }
-    num_bits_in_queue_ += count;
+    m_num_bits_in_queue += count;
 }
 
 unsigned int jblaster::write_masked(char tms, uint32_t* ptdibitarray, unsigned int count, unsigned int idx)
 {
     printd("\nwrite_masked: %d %d %d\n", tms, count, idx);
     checkJtagTask(count, idx);
-    for (unsigned int i = 0; i<count; i++)
+    for (unsigned int i = 0; i < count; i++)
     {
         uint32_t dw, mask;
         char tdi;
@@ -121,47 +126,47 @@ unsigned int jblaster::write_masked(char tms, uint32_t* ptdibitarray, unsigned i
         char c = 0;
         if (tms) c |= TMS_BIT;
         if (tdi) c |= TDI_BIT;
-        jtask_->data[jtask_->wr_idx++] = c;
+        m_jtask->data[m_jtask->wr_idx++] = c;
     }
-    num_bits_in_queue_ += count;
+    m_num_bits_in_queue += count;
     return 0;
 }
 
 unsigned int jblaster::send_recv(unsigned int need_rdata)
 {
     int r = 1;
-    //printd("send-recv\n");
-    if (jtask_) {
-        jtag_queue_.push_back(jtask_);
-        jtask_ = { nullptr };
+    if (m_jtask)
+    {
+        m_jtag_queue.push_back(m_jtask);
+        m_jtask = { nullptr };
     }
 
-    if (last_bits_flags_org_ == 0x13) {
-        while (!jtag_queue_.empty()) {
-            struct jtag_task* jt = jtag_queue_.front();
-            //printd("send-recv: need tdo %d bits %d in list %d\n",jt->need_tdo,jt->wr_idx, jtag_queue_.size());
-            //write_jtag_stream(jt); //jtag mode
+    if (m_last_bits_flags_org == 0x13)
+    {
+        while (!m_jtag_queue.empty())
+        {
+            struct jtag_task* jt = m_jtag_queue.front();
             jt->need_tdo = 1;
             write_jtag_stream_as(jt); //active serial
-            jtag_queue_.pop_front();
-            num_bits_in_queue_ -= jt->wr_idx;
-            delete[]jt;
+            m_jtag_queue.pop_front();
+            m_num_bits_in_queue -= jt->wr_idx;
+            delete [] jt;
         }
     }
-    else {
-        while (!jtag_queue_.empty()) {
-            struct jtag_task* jt = jtag_queue_.front();
-            //printd("send-recv: need tdo %d bits %d in list %d\n",jt->need_tdo,jt->wr_idx, jtag_queue_.size());
-            //jt->need_tdo = 1;
+    else
+    {
+        while (!m_jtag_queue.empty())
+        {
+            struct jtag_task* jt = m_jtag_queue.front();
             write_jtag_stream( jt ); //jtag mode
-            jtag_queue_.pop_front();
-            num_bits_in_queue_ -= jt->wr_idx;
-            delete[]jt;
+            m_jtag_queue.pop_front();
+            m_num_bits_in_queue -= jt->wr_idx;
+            delete [] jt;
         }
     }
 
-    curr_idx_ = 0;
-    num_bits_in_queue_ = 0;
+    m_curr_idx = 0;
+    m_num_bits_in_queue = 0;
     return r;
 }
 
@@ -170,8 +175,10 @@ unsigned int jblaster::printTdiTms(const unsigned char* buf, int num_bits)
     unsigned char dbg[16];
     unsigned char c = 0;
     memset(dbg, 0, sizeof(dbg));
-    int num = min(num_bits,64);
-    for (int i = 0; i < num; i++) {
+    int num = std::min(num_bits,64);
+
+    for (int i = 0; i < num; i++)
+    {
         if ((i & 3) == 0)
             c = buf[i];
         else
@@ -185,7 +192,8 @@ unsigned int jblaster::printTdiTms(const unsigned char* buf, int num_bits)
                         c = c | (buf[i] << 6);
         dbg[i / 4] = c;
     }
-    printd("tms-tdi (%d): %02X %02X %02X %02X %02X %02X\n", num_bits, dbg[0], dbg[1], dbg[2], dbg[3], dbg[4], dbg[5] );
+    printd("tms-tdi (%d): %02X %02X %02X %02X %02X %02X\n",
+           num_bits, dbg[0], dbg[1], dbg[2], dbg[3], dbg[4], dbg[5] );
     return 0;
 }
 
@@ -195,7 +203,9 @@ unsigned int jblaster::checkSum(const unsigned char* buf, int num_bits )
     int len = (num_bits + 7) / 8;
     unsigned int POLY = 0x82f63b78;
     unsigned int crc = 0;
-    while (len--) {
+
+    while (len--)
+    {
         crc ^= *buf++;
         for (k = 0; k < 8; k++)
             crc = crc & 1 ? (crc >> 1) ^ POLY : crc >> 1;
@@ -214,7 +224,7 @@ struct hw_descriptor hw_descriptor_my;
 unsigned int hwproc_listdev(int port_num, char* pblaster_name, int blaster_name_sz)
 {
     //do not support more then 4 blasters
-    if (port_num>MAX_DEV_NUM - 1)
+    if (port_num > (MAX_DEV_NUM - 1))
         return 0;
 
     //do we have ftdi attached?
@@ -231,11 +241,10 @@ unsigned int hwproc_listdev(int port_num, char* pblaster_name, int blaster_name_
 int g_num_open = 0;
 
 //called by jtagsrv opening desired blaster
-int hwproc_open_init(
-    void** pmycontext,              //put my context pointer here
-    char* pdevname,                 //string like "USB-0"
-    struct jtagsrv_interface* pjtagsrv_struct,      //jtagsrv struct has pointers to some usefull functions
-    void* jtagsrv_context   //jtagsrv functions context
+int hwproc_open_init(void** pmycontext,                         // put my context pointer here
+                     char* pdevname,                            // string like "USB-0"
+                     struct jtagsrv_interface* pjtagsrv_struct, // jtagsrv struct has pointers to some usefull functions
+                     void* jtagsrv_context                      // jtagsrv functions context
     )
 {
     //result OK
@@ -243,19 +252,21 @@ int hwproc_open_init(
     int status;
     int dev_idx = PortName2Idx(pdevname);
 
-    if (dev_idx < 0) {
+    if (dev_idx < 0)
+    {
         return 0;
     }
 
-    printd("------------------ (%d) open jtag blaster %d %s --------------------\n", g_num_open, dev_idx, pdevname);
+    printd("------------------ (%d) open jtag blaster %d %s --------------------\n",
+           g_num_open, dev_idx, pdevname);
 
     jblaster* pblaster = g_pblaster[dev_idx] = CreateBlaster(dev_idx);
     if (pblaster == nullptr)
         return 0;
-    printd("pblaster context = %p\n", pblaster);
     
     status = pblaster->configure();
-    if ( status==0 ) {
+    if (status == 0)
+    {
         printd("cannot configure MPSSE %d %s\n", dev_idx, pdevname);
         return 0;
     }
@@ -265,12 +276,12 @@ int hwproc_open_init(
 
     //save jtagsrv interface struct
     unsigned int jtagsrvi_sz = sizeof(jtagsrvi);
-    if (jtagsrvi_sz>pjtagsrv_struct->size)
+    if (jtagsrvi_sz > pjtagsrv_struct->size)
         jtagsrvi_sz = pjtagsrv_struct->size;
     memcpy(&jtagsrvi, pjtagsrv_struct, jtagsrvi_sz);
 
     //save jtagsrv context
-    pblaster->jtagsrv_context_ = jtagsrv_context;
+    //pblaster->m_jtagsrv_context = jtagsrv_context;
     return r;
 }
 
@@ -329,7 +340,6 @@ unsigned int hwproc_unkn11(void* a, unsigned int b, unsigned int c, unsigned int
 unsigned int hwproc_send_recv(void* context, unsigned int need_rdata)
 {
     jblaster* pblaster = (jblaster*)context; 
-    //printd("hwproc_send_recv %d %d\n", need_rdata);
     unsigned int r = pblaster->send_recv(need_rdata);
     return r;
 }
@@ -348,7 +358,6 @@ unsigned int hwproc_write_flags_read_status(void* context, unsigned int flags, u
 unsigned int hwproc_write_pattern(void* context, unsigned int tms, unsigned int tdi, unsigned int count, unsigned int idx)
 {
     jblaster* pblaster = (jblaster*)context; 
-    //printd("hwproc_pattern %p %d %d %d %d\n",context,tms,tdi,count,idx);
     pblaster->write_pattern(tms,tdi,count,idx);
     return 0;
 }
@@ -356,7 +365,6 @@ unsigned int hwproc_write_pattern(void* context, unsigned int tms, unsigned int 
 unsigned int hwproc_write_masked(void* context, unsigned int tms, unsigned int* ptdibitarray, unsigned int count, unsigned int idx)
 {
     jblaster* pblaster = (jblaster*)context; 
-    //printd("hwproc_write_masked %p %d %p %d\n",context,tms,ptdibitarray,count);
     pblaster->write_masked(tms, ptdibitarray, count, idx);
     return 0;
 }
