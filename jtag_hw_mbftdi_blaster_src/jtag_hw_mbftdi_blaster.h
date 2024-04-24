@@ -65,14 +65,16 @@ private:
 	unsigned int write_jtag_stream( struct jtag_task* jt );
 	unsigned int flush_passive_serial();
 
-	FT_HANDLE m_ftHandle{ nullptr };
-	int m_mode_as{ 0 }; //mean Active Serial mode
-	int m_curr_idx{ 0 };
-	int m_num_rbytes{ 0 };
-	unsigned char m_sbuf[RW_BUF_SIZE];
-	unsigned char m_jbuf[RW_BUF_SIZE];
-	unsigned char m_rbuf[RW_BUF_SIZE];
-	unsigned char m_rbufn[RW_BUF_SIZE];
-	char* m_tdi{ nullptr };
-	char* m_tms{ nullptr };
+	FT_HANDLE ftHandle_{ nullptr };
+	//unsigned char last_bits_flags_{ 0 };
+	//unsigned char last_bits_flags_org_{ 0 };
+	int mode_as_{ 0 }; //mean Active Serial mode
+	int curr_idx_{ 0 };
+	int num_rbytes_{ 0 };
+	unsigned char sbuf_[RW_BUF_SIZE];
+	unsigned char jbuf_[RW_BUF_SIZE];
+	unsigned char rbuf_[RW_BUF_SIZE];
+	unsigned char rbufn_[RW_BUF_SIZE];
+	char* tdi_{ nullptr };
+	char* tms_{ nullptr };
 };

@@ -4,6 +4,8 @@
 #include <list>
 #include <mutex>
 
+using namespace std;
+
 #ifdef X32
 #define PROG_NAME_SUFFIX " (32)"
 #else
@@ -47,7 +49,7 @@ public:
     virtual unsigned int set_config_value(char* key, unsigned int value) { return 1; };
     virtual unsigned int get_config_value(char* key, unsigned int* value) { return 1; };
     virtual int configure() { return 1; };
-    //void*  jtagsrv_context_{ nullptr };
+    void*  jtagsrv_context_{ nullptr };
     unsigned int checkSum(const unsigned char* buf, int num_bits);
     unsigned int printTdiTms(const unsigned char* buf, int num_bits);
 protected:
@@ -58,22 +60,22 @@ protected:
     virtual unsigned int write_jtag_stream_as( struct jtag_task* jt ) { return 1; };
     virtual unsigned int write_jtag_stream( struct jtag_task* jt ) { return 1; };
     virtual unsigned int read_pass_jtagsrv(unsigned int num_bytes, unsigned char* rbufn) { return 0; };
+    //unsigned int flush_passive_serial();
 
-    int m_dev_idx{ 0 };
-    unsigned char m_last_bits_flags{ 0 };
-    unsigned char m_last_bits_flags_org{ 0 };
-    int m_mode_as{ 0 }; //mean Active Serial mode
-    int m_curr_idx{ 0 };
-    int m_num_rbytes{ 0 };
-    unsigned char m_sbuf[RW_BUF_SIZE];
-    unsigned char m_jbuf[RW_BUF_SIZE];
-    unsigned char m_rbuf[RW_BUF_SIZE];
-    unsigned char m_rbufn[RW_BUF_SIZE];
-    void* m_jtagsrv_context{ nullptr };
-    
-    unsigned int m_num_bits_in_queue{ 0 };
-    std::list<struct jtag_task*> m_jtag_queue;
-    struct jtag_task* m_jtask{ nullptr };
+    int dev_idx_{ 0 };
+    unsigned char last_bits_flags_{ 0 };
+    unsigned char last_bits_flags_org_{ 0 };
+    int mode_as_{ 0 }; //mean Active Serial mode
+    int curr_idx_{ 0 };
+    int num_rbytes_{ 0 };
+    unsigned char sbuf_[RW_BUF_SIZE];
+    unsigned char jbuf_[RW_BUF_SIZE];
+    unsigned char rbuf_[RW_BUF_SIZE];
+    unsigned char rbufn_[RW_BUF_SIZE];
+
+    unsigned int num_bits_in_queue_{ 0 };
+    list<struct jtag_task*> jtag_queue_;
+    struct jtag_task* jtask_{ nullptr };
 };
 
 extern struct jtagsrv_interface jtagsrvi;
