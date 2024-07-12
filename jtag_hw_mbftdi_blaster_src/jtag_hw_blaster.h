@@ -38,7 +38,8 @@ struct jtag_task
     unsigned char data[1];
 };
 
-class jblaster {
+class jblaster
+{
 public:
     jblaster( int idx );
     virtual ~jblaster();
@@ -47,26 +48,24 @@ public:
     unsigned int send_recv(unsigned int need_rdata);
     virtual unsigned int write_flags_read_status(unsigned int flags, unsigned int* pstatus) { return 0; };
     virtual unsigned int set_config_value(char* key, unsigned int value) { return 1; };
-    virtual unsigned int get_config_value(char* key, unsigned int* value) { return 1; };
+    virtual unsigned int get_config_value(const char* key, unsigned int* value) { return 1; };
     virtual int configure() { return 1; };
     void*  jtagsrv_context_{ nullptr };
-    unsigned int checkSum(const unsigned char* buf, int num_bits);
-    unsigned int printTdiTms(const unsigned char* buf, int num_bits);
+    unsigned int checksum(const unsigned char* buf, int num_bits);
+    unsigned int print_tdi_tms(const unsigned char* buf, int num_bits);
 protected:
-    void allocJtagTask(unsigned int count, unsigned int need_tdo);
-    void reallocJtagTask(unsigned int count);
-    void checkJtagTask( unsigned int count, unsigned int idx );
-    //unsigned int write_read_as_buffer(unsigned int wr_len, unsigned int rd_len, unsigned int bitsidx, unsigned int need_read);
+    void alloc_jtag_task(unsigned int count, unsigned int need_tdo);
+    void realloc_jtag_task(unsigned int count);
+    void check_jtag_task( unsigned int count, unsigned int idx );
     virtual unsigned int write_jtag_stream_as( struct jtag_task* jt ) { return 1; };
     virtual unsigned int write_jtag_stream( struct jtag_task* jt ) { return 1; };
     virtual unsigned int read_pass_jtagsrv(unsigned int num_bytes, unsigned char* rbufn) { return 0; };
-    //unsigned int flush_passive_serial();
 
-    int dev_idx_{ 0 };
+    int m_dev_idx{ 0 };
     unsigned char last_bits_flags_{ 0 };
     unsigned char last_bits_flags_org_{ 0 };
     int mode_as_{ 0 }; //mean Active Serial mode
-    int curr_idx_{ 0 };
+    int m_curr_idx{ 0 };
     int num_rbytes_{ 0 };
     unsigned char sbuf_[RW_BUF_SIZE];
     unsigned char jbuf_[RW_BUF_SIZE];
@@ -79,9 +78,9 @@ protected:
 };
 
 extern struct jtagsrv_interface jtagsrvi;
-extern int InitBlasterLibrary();
-extern const char* GetBlasterName();
-extern int PortName2Idx(const char* PortName);
-extern jblaster* CreateBlaster(int idx);
-extern void DeleteBlaster(jblaster* jbl);
-extern int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz);
+extern int init_blaster_library();
+extern const char* get_blaster_name();
+extern int port_name_2_idx(const char* PortName);
+extern jblaster* create_blaster(int idx);
+extern void delete_blaster(jblaster* jbl);
+extern int search_blasters(int port_num, char* pblaster_name, int blaster_name_sz);

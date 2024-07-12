@@ -65,7 +65,7 @@ net_blaster::~net_blaster()
 //-----------------------------
 //Network related functions
 //-----------------------------
-int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
+int search_blasters(int port_num, char* pblaster_name, int blaster_name_sz)
 {
     printd("hwproc_listdev %d %p %d\n", port_num, pblaster_name, blaster_name_sz);
     //do not support more then N blasters
@@ -117,7 +117,7 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
     return g_num_nw_ports;
 }
 
-int PortName2Idx(const char* PortName) 
+int port_name_2_idx(const char* PortName) 
 {
     int dev_idx = -1;
 
@@ -135,12 +135,12 @@ int PortName2Idx(const char* PortName)
     return dev_idx;
 }
 
-const char* GetBlasterName()
+const char* get_blaster_name()
 {
     return PROGRAMER_NAME PROG_NAME_SUFFIX;
 }
 
-int InitBlasterLibrary()
+int init_blaster_library()
 {
     if (g_udp_sock)
         delete g_udp_sock;
@@ -148,7 +148,7 @@ int InitBlasterLibrary()
     return 0;
 }
 
-jblaster* CreateBlaster(int idx)
+jblaster* create_blaster(int idx)
 {
     net_blaster* pblaster = nullptr;
     try {
@@ -159,7 +159,7 @@ jblaster* CreateBlaster(int idx)
     return (jblaster*)pblaster;
 }
 
-void DeleteBlaster( jblaster* jbl )
+void delete_blaster( jblaster* jbl )
 {
     delete static_cast<net_blaster*>(jbl);
 }
@@ -188,7 +188,7 @@ unsigned int net_blaster::write_jtag_stream_as( unsigned int start_idx, unsigned
 
 unsigned int net_blaster::write_jtag_stream( struct jtag_task* jt )
 {
-    printTdiTms(jt->data,jt->wr_idx);
+    print_tdi_tms(jt->data,jt->wr_idx);
 
     struct nw_cmd nwcmd;
     nwcmd.setLength(jt->wr_idx);
@@ -196,7 +196,7 @@ unsigned int net_blaster::write_jtag_stream( struct jtag_task* jt )
     nwcmd.param1 = jt->wr_idx;
     nwcmd.param2 = 0;
     int r1 = tcp_sock->sendData((char*)&nwcmd, nwcmd.size());
-    printTdiTms(&jt->data[0], jt->wr_idx);
+    print_tdi_tms(&jt->data[0], jt->wr_idx);
     int r2 = tcp_sock->sendData((char*)&jt->data[0], jt->wr_idx);
     //printd("nw_send_recv num bits %d (%d %d)\n", jt->wr_idx, r1, r2);
     if (r1==0 && r2==0) {
@@ -212,7 +212,7 @@ unsigned int net_blaster::write_jtag_stream( struct jtag_task* jt )
                         unsigned char* jptr = &jt->data[0];
                         //jtagr = 
                         jtagsrvi.jtagsrv_pass_data((void*)jtagsrv_context_, jptr, nw_rcv_cmd.param1);
-                        printd("jtagsrv_pass_data, numbits: %d Chk %08X Data: %02x %02x %02x %02x %02x %02x\n", nw_rcv_cmd.param1, checkSum(jptr, nw_rcv_cmd.param1),
+                        printd("jtagsrv_pass_data, numbits: %d Chk %08X Data: %02x %02x %02x %02x %02x %02x\n", nw_rcv_cmd.param1, checksum(jptr, nw_rcv_cmd.param1),
                                jptr[0], jptr[1], jptr[2], jptr[3], jptr[4], jptr[5]);
 
                     }

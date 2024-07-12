@@ -7,247 +7,17 @@
 #include <string>
 #include <sstream>
 
-#ifdef _WINDOWS
-#include <windows.h>
-#include "ftd2xx.h"
-void do_sleep(int ms) { Sleep(ms);  }
-#else
 #include <unistd.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include "lftdi136/ftd2xx.h"
-//#include "linux_ftdi/ftd2xx.h"
 void do_sleep(int ms) { usleep(ms*1000); }
-#endif
 
 #include "debug.h"
 #include "jtagsrv.h"
 #include "CConfig.h"
 #include "jtag_hw_mbftdi_blaster.h"
 
-int  g_cfg_channel = 0;
-bool g_cfg_channel_set = false;
-int  g_cfg_frequency = 10000000;
-bool g_cfg_frequency_set = false;
-
-#ifdef _WINDOWS
-
-bool read_blaster_config()
-{
-    char cCurrentPath[FILENAME_MAX];
-    DWORD ret = GetModuleFileNameA(NULL, cCurrentPath, sizeof(cCurrentPath));
-    if (ret == 0 || GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-        return false;
-    }
-    //search latest slash in the path
-    char* ptr = cCurrentPath;
-    char* ptr2slash = nullptr;
-    for (int i = 0; i < sizeof(cCurrentPath); i++) {
-        if (*ptr == 0)
-            break;
-        if (*ptr == '\\')
-            ptr2slash = ptr;
-        ptr++;
-    }
-    if (ptr2slash) {
-        //slash found
-        ptr2slash++;
-        *ptr2slash = 0;
-        printd("Working directory: %s", cCurrentPath);
-        strcat(cCurrentPath, "mbftdi.cfg"); //mbftdi.cfg string is shorter then jtagserver.exe, should fit
-
-        try {
-            ifstream fin(cCurrentPath);
-            if (fin.is_open()) {
-                string line, sleft, sright;
-
-                while (getline(fin, line)) {
-                    size_t pos = line.find("=");
-                    if (pos == string::npos) {
-                        //"=" was not found, so skip this line
-                        continue;
-                    }
-                    sleft = line.substr(0, pos);
-                    sright = line.substr(pos + 1);
-                    printd("Cfg: %s %s", sleft.c_str(), sright.c_str());
-                    if (sleft == "channel") {
-                        g_cfg_channel = stoi(sright, 0, 10); g_cfg_channel_set = true;
-                    }
-                    if (sleft == "frequency") {
-                        g_cfg_frequency = stoi(sright, 0, 10); g_cfg_frequency_set = true;
-                    }
-                }
-            }
-        }
-        catch (...) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-//-----------------------------
-//FTDI load DLL
-//-----------------------------
-
-typedef FT_STATUS(WINAPI *PtrToOpen)(unsigned int, FT_HANDLE *);
-PtrToOpen g_pOpen = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToOpenEx)(PVOID, unsigned int, FT_HANDLE *);
-PtrToOpenEx g_pOpenEx = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToListDevices)(PVOID, PVOID, unsigned int);
-PtrToListDevices g_pListDevices = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToClose)(FT_HANDLE);
-PtrToClose g_pClose = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToRead)(FT_HANDLE, LPVOID, unsigned int, unsigned int*);
-PtrToRead g_pRead = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToWrite)(FT_HANDLE, LPVOID, unsigned int, unsigned int*);
-PtrToWrite g_pWrite = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToResetDevice)(FT_HANDLE);
-PtrToResetDevice g_pResetDevice = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToPurge)(FT_HANDLE, ULONG);
-PtrToPurge g_pPurge = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToSetTimeouts)(FT_HANDLE, ULONG, ULONG);
-PtrToSetTimeouts g_pSetTimeouts = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToGetQueueStatus)(FT_HANDLE, unsigned int*);
-PtrToGetQueueStatus g_pGetQueueStatus = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToSetChars)(FT_HANDLE, UCHAR, UCHAR, UCHAR, UCHAR);
-PtrToSetChars g_pSetChars = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToCreateDeviceInfoList)(unsigned int*);
-PtrToCreateDeviceInfoList g_pCreateDeviceInfoList = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToGetDeviceInfoList)(PVOID, unsigned int*);
-PtrToGetDeviceInfoList g_pGetDeviceInfoList = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToSetBitMode)(FT_HANDLE, UCHAR, UCHAR);
-PtrToSetBitMode g_pSetBitMode = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToSetUSBParameters)(FT_HANDLE, ULONG, ULONG);
-PtrToSetUSBParameters g_pSetUSBParameters = nullptr;
-
-typedef FT_STATUS(WINAPI *PtrToSetLatencyTimer)(FT_HANDLE, UCHAR);
-PtrToSetLatencyTimer g_pSetLatencyTimer = nullptr;
-
-int InitBlasterLibrary()
-{
-    HMODULE hmodule = LoadLibraryA("Ftd2xx.dll");
-    if (hmodule == nullptr) {
-        printd("Error: Can't load FTDI Dll\n");
-        return -1;
-    }
-
-    g_pWrite = (PtrToWrite)GetProcAddress(hmodule, "FT_Write");
-    if (g_pWrite == nullptr) {
-        printd("Error: Can't Find FT_Write\n");
-        return -1;
-    }
-
-    g_pRead = (PtrToRead)GetProcAddress(hmodule, "FT_Read");
-    if (g_pRead == nullptr) {
-        printd("Error: Can't Find FT_Read\n");
-        return -1;
-    }
-
-    g_pOpen = (PtrToOpen)GetProcAddress(hmodule, "FT_Open");
-    if (g_pOpen == nullptr) {
-        printd("Error: Can't Find FT_Open\n");
-        return -1;
-    }
-
-    g_pOpenEx = (PtrToOpenEx)GetProcAddress(hmodule, "FT_OpenEx");
-    if (g_pOpenEx == nullptr) {
-        printd("Error: Can't Find FT_OpenEx\n");
-        return -1;
-    }
-
-    g_pListDevices = (PtrToListDevices)GetProcAddress(hmodule, "FT_ListDevices");
-    if (g_pListDevices == nullptr) {
-        printd("Error: Can't Find FT_ListDevices\n");
-        return -1;
-    }
-
-    g_pClose = (PtrToClose)GetProcAddress(hmodule, "FT_Close");
-    if (g_pClose == nullptr) {
-        printd("Error: Can't Find FT_Close\n");
-        return -1;
-    }
-
-    g_pResetDevice = (PtrToResetDevice)GetProcAddress(hmodule, "FT_ResetDevice");
-    if (g_pResetDevice == nullptr) {
-        printd("Error: Can't Find FT_ResetDevice\n");
-        return -1;
-    }
-
-    g_pPurge = (PtrToPurge)GetProcAddress(hmodule, "FT_Purge");
-    if (g_pPurge == nullptr) {
-        printd("Error: Can't Find FT_Purg\n");
-        return -1;
-    }
-
-    g_pSetTimeouts = (PtrToSetTimeouts)GetProcAddress(hmodule, "FT_SetTimeouts");
-    if (g_pSetTimeouts == nullptr) {
-        printd("Error: Can't Find FT_SetTimeouts\n");
-        return -1;
-    }
-
-    g_pGetQueueStatus = (PtrToGetQueueStatus)GetProcAddress(hmodule, "FT_GetQueueStatus");
-    if (g_pGetQueueStatus == nullptr) {
-        printd("Error: Can't Find FT_GetQueueStatus\n");
-        return -1;
-    }
-
-    g_pSetChars = (PtrToSetChars)GetProcAddress(hmodule, "FT_SetChars");
-    if (g_pSetChars == nullptr) {
-        printd("Error: Can't Find FT_SetChars\n");
-        return -1;
-    }
-
-    g_pCreateDeviceInfoList = (PtrToCreateDeviceInfoList)GetProcAddress(hmodule, "FT_CreateDeviceInfoList");
-    if (g_pCreateDeviceInfoList == nullptr) {
-        printd("Error: Can't Find FT_CreateDeviceInfoList\n");
-        return -1;
-    }
-
-    g_pGetDeviceInfoList = (PtrToGetDeviceInfoList)GetProcAddress(hmodule, "FT_GetDeviceInfoList");
-    if (g_pGetDeviceInfoList == nullptr) {
-        printd("Error: Can't Find FT_GetDeviceInfoList\n");
-        return -1;
-    }
-
-    g_pSetBitMode = (PtrToSetBitMode)GetProcAddress(hmodule, "FT_SetBitMode");
-    if (g_pSetBitMode == nullptr) {
-        printd("Error: Can't Find FT_SetBitMode\n");
-        return -1;
-    }
-
-    g_pSetUSBParameters = (PtrToSetUSBParameters)GetProcAddress(hmodule, "FT_SetUSBParameters");
-    if (g_pSetUSBParameters == nullptr) {
-        printd("Error: Can't Find FT_SetUSBParameters\n");
-        return -1;
-    }
-
-    g_pSetLatencyTimer = (PtrToSetLatencyTimer)GetProcAddress(hmodule, "FT_SetLatencyTimer");
-    if (g_pSetLatencyTimer == nullptr) {
-        printd("Error: Can't Find FT_SetLatencyTimer\n");
-        return -1;
-    }
-
-    read_blaster_config();
-
-    return 0;
-}
-#else
 //use static linking in Linux
 #define g_pOpen FT_Open
 #define g_pOpenEx FT_OpenEx
@@ -266,150 +36,56 @@ int InitBlasterLibrary()
 #define g_pSetUSBParameters FT_SetUSBParameters
 #define g_pSetLatencyTimer FT_SetLatencyTimer
 
-int InitBlasterLibrary()
+int init_blaster_library()
 {
     return 0;
 }
 
-#endif
-
-const char* GetBlasterName()
+const char* get_blaster_name()
 {
     return PROGRAMER_NAME PROG_NAME_SUFFIX;
 }
 
 FT_DEVICE_LIST_INFO_NODE g_device_node[NUM_NODES];
 
-//return nonzero if device has SerialNo in range
-//FT_DEVICE_LIST_INFO_NODE field SerialNumber
-int accept_serialno(char* pserialno, int maxlen)
+int is_bittware_card(FT_DEVICE_LIST_INFO_NODE* device_node)
 {
-    if (CHECK_SERIAL)
+    std::string serial;
+    std::string descr;
+    
+    printd("is_bittware_card () 0x%x\n", device_node->ID);
+    if (device_node->ID != VIDPID_FT4232)
+        return 0;
+
+    serial = std::string(device_node->SerialNumber);
+    descr = std::string(device_node->Description);
+    printd("serial %s, desc %s\n", serial.c_str(), descr.c_str());
+ 
+    if (serial.substr(0, 4) == std::string("ACVP"))
     {
-        int i, j = 0;
-        unsigned int iSerialNo = 0;
-        char Prefix[32];
-        Prefix[0] = 0;
-        for (i = 0; i<maxlen; i++)
-        {
-            //check for end of serialno string
-            if (pserialno[i] == 0)
-                break; //end of string
-
-            //check for serialno digit
-            if (pserialno[i] >= '0' && pserialno[i] <= '9')
-            {
-                //decimal digit
-                iSerialNo = iSerialNo * 10 + (pserialno[i] - 0x30);
-                continue;
-            }
-            else
-            {
-                //possibly prefix?
-                Prefix[j] = pserialno[i];
-                j++;
-                Prefix[j] = 0;
-                if (j == (sizeof(Prefix) - 1))
-                    break;
-            }
-        }
-
-        //check range
-        if (iSerialNo<SERIAL_MIN || iSerialNo >= SERIAL_MAX)
-        {
-            printd("Bad serial num %d\n", iSerialNo);
-            return 0;
-        }
-        //check prefix
-        Prefix[3] = 0;
-        if (memcmp(Prefix, SERIAL_PREFIX, 3) == 0)
+        // Achronix Card
+        // needs channel B
+        if (descr.back() == 'B')
             return 1;
-        printd("Bad serial prefix %s\n", Prefix);
         return 0;
     }
-    else
-        return 1; //always accept any serial
-}
-
-//return nonzero if this FTDI channel is accepted
-//channel determined from struct FT_DEVICE_LIST_INFO_NODE field Description
-int accept_channel(char* pdescription, int maxlen)
-{
-    int i;
-    char channel = '-';
-    //get channel letter at the end of description string
-    for (i = 1; i<maxlen; i++)
+    if (serial.substr(0, 2) == std::string("BW"))
     {
-        if (pdescription[i] == 0)
-        {
-            channel = pdescription[i - 1];
-            break;
-        }
+        // Bittware Card
+        // needs channel A
+        if (descr.back() == 'A')
+             return 1;
     }
-
-    if (g_cfg_channel_set)
-    {
-        //use configuration for channel selection
-        if (g_cfg_channel == 0 && channel == 'A')
-            return 1;
-        if (g_cfg_channel == 1 && channel == 'B')
-            return 1;
-        if (g_cfg_channel == 2 && channel == 'C')
-            return 1;
-        if (g_cfg_channel == 3 && channel == 'D')
-            return 1;
-    }
-    else
-    {
-        //check channel
-        if (USE_CHANNEL_A && channel == 'A')
-            return 1;
-        if (USE_CHANNEL_B && channel == 'B')
-            return 1;
-    }
-    printd("Bad channel %c\n", channel);
     return 0;
-}
-
-//return nonzero if this FTDI description is accepted
-//FT_DEVICE_LIST_INFO_NODE field Description
-int accept_description(char* pdescription, int maxlen)
-{
-    if (CHECK_DESCRIPTION)
-    {
-        int i;
-        char need_descr[] = { NEED_DESCRIPTION };
-
-        for (i = 0; i < maxlen; i++)
-        {
-            if (need_descr[i] == 0)
-                return 1;
-            if (pdescription[i] != need_descr[i])
-            {
-                printd("Bad description %s\n", pdescription);
-                return 0;
-            }
-        }
-
-        printd("Bad description %s\n", pdescription);
-        return 0;
-    }
-    else
-        return 1;
 }
 
 int id2id(int ftdi_id)
 {
     int i, j;
     j = 0;
-    for (i = 0; i<NUM_NODES; i++)
+    for (i = 0; i < NUM_NODES; i++)
     {
-        if (
-            ((g_device_node[i].ID == VIDPID_FT2232) || (g_device_node[i].ID == VIDPID_FT4232)) &&
-            accept_serialno(g_device_node[i].SerialNumber, sizeof(g_device_node[i].SerialNumber)) &&
-            accept_description(g_device_node[i].Description, sizeof(g_device_node[i].Description)) &&
-            accept_channel(g_device_node[i].Description, sizeof(g_device_node[i].Description))
-            )
+        if (is_bittware_card(&g_device_node[i]))
         {
             if (ftdi_id == j)
                 return i;
@@ -421,17 +97,17 @@ int id2id(int ftdi_id)
 
 ftdi_blaster::ftdi_blaster( int idx ):jblaster(idx)
 {
-    // Open the port - For this application note, assume the first device is a FT2232H or FT4232H
+    // Open the port - For this application note, assume the first device is a FT4232H
     // Further checks can be made against the device descriptions, locations, serial numbers, etc.
     // before opening the port.
     int local_id = id2id(idx);
     printd("Try to open ftdi dev %d, local_id %d\n", idx, local_id);
-    if (local_id<0)
+    if (local_id < 0)
     {
         printd("bad local_id %d\n", local_id);
         throw;
     }
-    FT_STATUS ftStatus = g_pOpen(local_id, &ftHandle_);
+    FT_STATUS ftStatus = g_pOpen(local_id, &m_ftHandle);
     if (ftStatus != FT_OK)
     {
         printd("Open Failed with error %d\n", ftStatus);
@@ -461,18 +137,18 @@ ftdi_blaster::~ftdi_blaster()
         byOutputBuffer[dwNumBytesToSend++] = 0x80;
         byOutputBuffer[dwNumBytesToSend++] = 0x00;
         byOutputBuffer[dwNumBytesToSend++] = 0x00;
-        g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+        g_pWrite(m_ftHandle, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
     }
 
     //close ftdi handle 
-    if(ftHandle_)
-        g_pClose( ftHandle_ );
+    if(m_ftHandle)
+        g_pClose( m_ftHandle );
 };
 
 //-----------------------------
 //FTDI related functions
 //-----------------------------
-int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
+int search_blasters(int port_num, char* pblaster_name, int blaster_name_sz)
 {
     unsigned int i;
     unsigned int dwNumDevs;
@@ -502,6 +178,11 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
 
     memset(g_device_node,0,sizeof(g_device_node));
     ftStatus = g_pGetDeviceInfoList(&g_device_node[0],&dwNumDevs);
+    if (ftStatus != FT_OK) // Did the command execute OK?
+    { 
+        printd("Error in getting the device info %d\n", ftStatus);
+        return -1; // Exit with error
+    }
     for(i = 0; i < dwNumDevs; i++)
     {
         printd(">%d %08X %08X %08X **%s**%s**\n",
@@ -512,10 +193,7 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
                g_device_node[i].SerialNumber,
                g_device_node[i].Description);
 
-        if (((g_device_node[i].ID == VIDPID_FT2232) || (g_device_node[i].ID == VIDPID_FT4232)) &&
-            accept_serialno(g_device_node[i].SerialNumber, sizeof(g_device_node[i].SerialNumber)) &&
-            accept_description(g_device_node[i].Description, sizeof(g_device_node[i].Description)) &&
-            accept_channel(g_device_node[i].Description, sizeof(g_device_node[i].Description)))
+        if (is_bittware_card(&g_device_node[i]))
         {
             myNumDevs++;
         }
@@ -525,7 +203,7 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
     }
 
     printd("FTDI devices found: %d - the count includes individual ports on a single chip\n", dwNumDevs);
-    printd("FTDI 2232H devices found %d\n", myNumDevs);
+    printd("BittWare Blaster devices found %d\n", myNumDevs);
 
     if (myNumDevs == 0) // Exit if we don't see any
     {
@@ -535,53 +213,53 @@ int SearchBlasters(int port_num, char* pblaster_name, int blaster_name_sz)
     return myNumDevs;
 }
 
-void DeleteBlaster(jblaster* jbl)
+void delete_blaster(jblaster* jbl)
 {
     delete static_cast<ftdi_blaster*>(jbl);
 }
 
-int PortName2Idx(const char* PortName)
+int port_name_2_idx(const char* PortName)
 {
     int dev_idx = PortName[DEV_NAME_SUFF_OFFSET] - 0x30;
     return dev_idx;
 }
 
-FT_STATUS ftdi_blaster::resetDevice()
+FT_STATUS ftdi_blaster::reset_device()
 {
     BYTE byInputBuffer[1024];
     unsigned int dwNumBytesToRead = 0; // Number of bytes available to read in the driver's input buffer
     unsigned int dwNumBytesRead = 0; // Count of actual bytes read - used with FT_Read
     //unsigned int dwClockDivisor = 29; // Value of clock divisor, SCL Frequency = 60/((1+vl)*2) (MHz)
-    printd("resetDevice\n");
+    printd("reset_device\n");
 
     //Reset USB device
     FT_STATUS ftStatus = 0;
-    ftStatus |= g_pResetDevice(ftHandle_);
+    ftStatus |= g_pResetDevice(m_ftHandle);
 
     //Purge USB receive buffer first by reading out all old data from FT2232H receive buffer
 
     // Get the number of bytes in the FT2232H receive buffer
-    ftStatus |= g_pGetQueueStatus( ftHandle_, &dwNumBytesToRead);
+    ftStatus |= g_pGetQueueStatus( m_ftHandle, &dwNumBytesToRead);
 
     //Read out the data from FT2232H receive buffer
     if ((ftStatus == FT_OK) && (dwNumBytesToRead > 0))
-        g_pRead(ftHandle_, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
+        g_pRead(m_ftHandle, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
 
     //Set USB request transfer sizes to 64K
-    ftStatus |= g_pSetUSBParameters(ftHandle_, 65536, 65535);
+    ftStatus |= g_pSetUSBParameters(m_ftHandle, 65536, 65535);
 
     //Disable event and error characters
-    ftStatus |= g_pSetChars(ftHandle_, false, 0, false, 0);
+    ftStatus |= g_pSetChars(m_ftHandle, false, 0, false, 0);
 
     //Sets the read and write timeouts in milliseconds
-    ftStatus |= g_pSetTimeouts(ftHandle_, 0, 5000);
+    ftStatus |= g_pSetTimeouts(m_ftHandle, 0, 5000);
 
     //Set the latency timer (default is 16mS)
-    ftStatus |= g_pSetLatencyTimer(ftHandle_, 16);
+    ftStatus |= g_pSetLatencyTimer(m_ftHandle, 16);
 
     //Reset controller
-    ftStatus |= g_pSetBitMode(ftHandle_, 0x0, 0x00);
-    ftStatus |= g_pSetBitMode(ftHandle_, 0x0, 0x02);
+    ftStatus |= g_pSetBitMode(m_ftHandle, 0x0, 0x00);
+    ftStatus |= g_pSetBitMode(m_ftHandle, 0x0, 0x02);
     return ftStatus;
 }
 
@@ -610,7 +288,7 @@ void ftdi_blaster::set_freq( unsigned int freq )
             byOutputBuffer[dwNumBytesToSend++] = (clk_div >> 8) & 0xFF;
             // Send off the clock divisor commands
             //ftStatus = 
-            g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+            g_pWrite(m_ftHandle, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
             return;
         }
     }
@@ -620,45 +298,56 @@ void ftdi_blaster::set_freq( unsigned int freq )
     printd("WARNING: Frequency set was ignored, cannot recognize value!\n");
 }
 
-int ftdi_blaster::configureMpsse()
+int ftdi_blaster::configure_mpsse()
 {
     BYTE byOutputBuffer[1024];
     BYTE byInputBuffer[1024];
     BOOL bCommandEchod;
-    unsigned int dwCount = 0; // General loop index
-    unsigned int dwNumBytesToSend = 0; // Index to the output buffer
+    unsigned int dw_count = 0; // General loop index
+    unsigned int dw_num_bytes_to_send = 0; // Index to the output buffer
     unsigned int dwNumBytesSent = 0; // Count of actual bytes sent - used with FT_Write
     unsigned int dwNumBytesToRead = 0; // Number of bytes available to read in the driver's input buffer
     unsigned int dwNumBytesRead = 0; // Count of actual bytes read - used with FT_Read
     unsigned int dwClockDivisor = 29; // Value of clock divisor, SCL Frequency = 60/((1+vl)*2) (MHz)
+    unsigned int config_clock_speed;
     FT_STATUS ftStatus;
 
+    if (get_config_value("JtagClock", &config_clock_speed))
+    {
+        // find divisor
+        // config_clock_speed = 60M/((1+dwClockDivisor) * 2)
+        // dwClockDivisor = (60M/config_clock_speed) / 2 - 1
+        // example (10MHz):
+        // dwClockDivisor = (60,000,000 / 10,000,000)/2 -1 = 2
+        dwClockDivisor = ((60000000 / config_clock_speed) / 2) - 1;
+    }
+    printd("FTDI Clock Divisor %d\n", dwClockDivisor);
     // -----------------------------------------------------------
     // Synchronize the MPSSE by sending a bogus opcode (0xAA),
     // The MPSSE will respond with "Bad Command" (0xFA) followed by
     // the bogus opcode itself.
     // -----------------------------------------------------------
     // Reset output buffer pointer
-    dwNumBytesToSend=0;
+    dw_num_bytes_to_send=0;
 
-    //Add bogus comman 0xAA to the queue
-    byOutputBuffer[dwNumBytesToSend++] = 0xAA;
+    //Add bogus command 0xAA to the queue
+    byOutputBuffer[dw_num_bytes_to_send++] = 0xAA;
     // Send off the BAD commands
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
     do
     {
         // Get the number of bytes in the device input buffer
-        ftStatus = g_pGetQueueStatus(ftHandle_, &dwNumBytesToRead);
+        ftStatus = g_pGetQueueStatus(m_ftHandle, &dwNumBytesToRead);
     } while ((dwNumBytesToRead == 0) && (ftStatus == FT_OK));
 
     //Read out the data from input buffer
-    ftStatus = g_pRead(ftHandle_, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
+    ftStatus = g_pRead(m_ftHandle, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
 
     //Check if Bad command and echo command received
     bCommandEchod = false;
-    for (dwCount = 0; dwCount < dwNumBytesRead - 1; dwCount++)
+    for (dw_count = 0; dw_count < dwNumBytesRead - 1; dw_count++)
     {
-        if ((byInputBuffer[dwCount] == 0xFA) && (byInputBuffer[dwCount+1] == 0xAA))
+        if ((byInputBuffer[dw_count] == 0xFA) && (byInputBuffer[dw_count+1] == 0xAA))
         {
             bCommandEchod = true;
             break;
@@ -668,7 +357,7 @@ int ftdi_blaster::configureMpsse()
     if (bCommandEchod == false)
     {
         printd("Error in synchronizing the MPSSE\n");
-        g_pClose(ftHandle_); ftHandle_ = nullptr;
+        g_pClose(m_ftHandle); m_ftHandle = nullptr;
         return -1; // Exit with error
     }
 
@@ -680,19 +369,19 @@ int ftdi_blaster::configureMpsse()
     // Set up the Hi-Speed specific commands for the FTx232H
 
     // Start with a fresh index
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
 
     // Use 60MHz master clock (disable divide by 5)
-    byOutputBuffer[dwNumBytesToSend++] = 0x8A;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x8A;
     // Turn off adaptive clocking (may be needed for ARM)
-    byOutputBuffer[dwNumBytesToSend++] = 0x97;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x97;
     // Disable three-phase clocking
-    byOutputBuffer[dwNumBytesToSend++] = 0x8D;
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x8D;
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
 
     // Send off the HS-specific commands
 
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
     // Set initial states of the MPSSE interface - low byte, both pin directions and output values
     // Pin name Signal Direction Config Initial State Config
     // ADBUS0 TCK output 1 low 0
@@ -701,55 +390,35 @@ int ftdi_blaster::configureMpsse()
     // ADBUS3 TMS output 1 high 1
     // ADBUS4 GPIOL0 input 0 0
     // ADBUS5 GPIOL1 input 0 0
-    // ADBUS6 GPIOL2 input 0 0
+    // ADBUS6 GPIOL2 output 1 high 1  (for ACVP cards needs to be output HIGH, IA cards can be high with no issue)
     // ADBUS7 GPIOL3 input 0 0
     // Set data bits low-byte of MPSSE port
-    byOutputBuffer[dwNumBytesToSend++] = 0x80;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x80;
     // Initial state config above
-    byOutputBuffer[dwNumBytesToSend++] = 0x08;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x48;
     // Direction config above
-    byOutputBuffer[dwNumBytesToSend++] = 0x0B;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x4B;
     // Send off the low GPIO config commands
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
 
-    dwNumBytesToSend = 0;
-    // Set initial states of the MPSSE interface - high byte, both pin directions and output values
-    // Pin name Signal Direction Config Initial State Config
-    // ACBUS0 GPIOH0 input 0 0
-    // ACBUS1 GPIOH1 input 0 0
-    // ACBUS2 GPIOH2 input 0 0
-    // ACBUS3 GPIOH3 input 0 0
-    // ACBUS4 GPIOH4 input 0 0
-    // ACBUS5 GPIOH5 input 0 0
-    // ACBUS6 GPIOH6 input 0 0
-    // ACBUS7 GPIOH7 input 0 0
-    // Set data bits low-byte of MPSSE port
-    byOutputBuffer[dwNumBytesToSend++] = 0x82;
-    // Initial state config above
-    byOutputBuffer[dwNumBytesToSend++] = 0x0;
-    // Direction config above
-    byOutputBuffer[dwNumBytesToSend++] = 0x0;
-    // Send off the high GPIO config commands
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
-
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
     // Set TCK frequency
     // TCK = 60MHz /((1 + [(1 +0xValueH*256) OR 0xValueL])*2)
     // Command to set clock divisor
-    byOutputBuffer[dwNumBytesToSend++] = 0x86;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x86;
     // Set 0xValueL of clock divisor
-    byOutputBuffer[dwNumBytesToSend++] = dwClockDivisor & 0xFF;
+    byOutputBuffer[dw_num_bytes_to_send++] = dwClockDivisor & 0xFF;
     // Set 0xValueH of clock divisor
-    byOutputBuffer[dwNumBytesToSend++] = (dwClockDivisor >> 8) & 0xFF;
+    byOutputBuffer[dw_num_bytes_to_send++] = (dwClockDivisor >> 8) & 0xFF;
     // Send off the clock divisor commands
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
 
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
     // Disable internal loop-back
     // Disable loopback
-    byOutputBuffer[dwNumBytesToSend++] = 0x85;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x85;
     // Send off the loopback command
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
 
     return ftStatus;
 }
@@ -761,7 +430,7 @@ unsigned int ftdi_blaster::read_pass_jtagsrv(unsigned int num_bytes, unsigned ch
     unsigned int dwNumBytesToRead = 0;
 
     //Read out the data from input buffer
-    ftStatus = g_pRead( ftHandle_, rbuf_, num_bytes, &dwNumBytesToRead );
+    ftStatus = g_pRead( m_ftHandle, rbuf_, num_bytes, &dwNumBytesToRead );
     if (ftStatus != FT_OK)
         return ftStatus;
 
@@ -783,7 +452,7 @@ unsigned int ftdi_blaster::read_pass_jtagsrv(unsigned int num_bytes, unsigned ch
     if (jtagsrvi.jtagsrv_pass_data) {
         //jtagr = 
         jtagsrvi.jtagsrv_pass_data((void*)jtagsrv_context_, jbuf_, curr);
-        printd("jtagsrv_pass_data, numbits: %d Chk %08X Data: %02x %02x %02x %02x %02x %02x\n", curr, checkSum(jbuf_,curr),
+        printd("jtagsrv_pass_data, numbits: %d Chk %08X Data: %02x %02x %02x %02x %02x %02x\n", curr, checksum(jbuf_,curr),
                jbuf_[0], jbuf_[1], jbuf_[2], jbuf_[3], jbuf_[4], jbuf_[5]);
     }
     return FT_OK;
@@ -791,15 +460,17 @@ unsigned int ftdi_blaster::read_pass_jtagsrv(unsigned int num_bytes, unsigned ch
 
 unsigned int ftdi_blaster::set_config_value(char* key, unsigned int value)
 {
+    printd("set_config_value %s = %d\n", key, value);
     return g_cfg.set_value(std::string(key), value);
 }
 
-unsigned int ftdi_blaster::get_config_value(char* key, unsigned int* value)
+unsigned int ftdi_blaster::get_config_value(const char* key, unsigned int* value)
 {
+    printd("get_config_value %s\n", key);
     return g_cfg.get_value(std::string(key), value);
 }
 
-jblaster* CreateBlaster(int idx)
+jblaster* create_blaster(int idx)
 {
     ftdi_blaster* pblaster = new ftdi_blaster(idx);
     return (jblaster*)pblaster;
@@ -808,9 +479,9 @@ jblaster* CreateBlaster(int idx)
 int ftdi_blaster::configure()
 {
     int r = 1;
-    int status = resetDevice();
+    int status = reset_device();
     do_sleep(10);
-    status = configureMpsse();
+    status = configure_mpsse();
     if(status != FT_OK) {
         printd("cannot configure MPSSE\n");
         return 0;
@@ -844,7 +515,7 @@ FT_STATUS ftdi_blaster::wait_answer( unsigned int expect_num_bytes )
 
         // Get the number of bytes in the device input buffer
         dwNumBytesToRead = 0;
-        ftStatus = g_pGetQueueStatus(ftHandle_, &dwNumBytesToRead);
+        ftStatus = g_pGetQueueStatus(m_ftHandle, &dwNumBytesToRead);
         if (ftStatus != FT_OK) {
             printd("GetQueueStatus %d error\n", ftStatus);
             return ftStatus;
@@ -867,7 +538,7 @@ unsigned int ftdi_blaster::flush_passive_serial()
     unsigned char b;
 
     //get number of bits to sbe sent
-    count = curr_idx_;
+    count = m_curr_idx;
 
     if( count == 0 )
         return 0; //nothing to send
@@ -918,9 +589,9 @@ unsigned int ftdi_blaster::flush_passive_serial()
         sbuf_[idx++] = b;
     }
 
-    curr_idx_ = 0;
+    m_curr_idx = 0;
 
-    ftStatus = g_pWrite(ftHandle_, sbuf_, idx, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, sbuf_, idx, &dwNumBytesSent);
     if( ftStatus != FT_OK || dwNumBytesSent!=idx )
         return 1;
 
@@ -940,7 +611,7 @@ unsigned int ftdi_blaster::write_read_as_buffer(unsigned int wr_len, unsigned in
     unsigned int m,dwNumBytesToRead,dwNumBytesSent;
     unsigned char blaster_status[WR_CHUNK],mask;
 
-    ftStatus = g_pWrite(ftHandle_, sbuf_, wr_len, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, sbuf_, wr_len, &dwNumBytesSent);
     if( ftStatus != FT_OK || dwNumBytesSent != wr_len )
         return 0; //error
 
@@ -952,7 +623,7 @@ unsigned int ftdi_blaster::write_read_as_buffer(unsigned int wr_len, unsigned in
 
         //read status bits from programmer
         dwNumBytesToRead = 0;
-        ftStatus = g_pRead(ftHandle_, &blaster_status, rd_len, &dwNumBytesToRead);
+        ftStatus = g_pRead(m_ftHandle, &blaster_status, rd_len, &dwNumBytesToRead);
         if( ftStatus != FT_OK || dwNumBytesToRead != rd_len )
             return 0; //error
 
@@ -975,13 +646,13 @@ unsigned int ftdi_blaster::write_jtag_stream_as( struct jtag_task* jt )
 {
     unsigned int j,k,tdi,tms;
     unsigned char port_val;
-    unsigned int dwNumBytesToSend;
+    unsigned int dw_num_bytes_to_send;
 
     printd("write_jtag_stream_as ACTIVE SERIAL!!!!!!!!!!!!!!!\n");
 
     j=0;
     k=0;
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
     for( unsigned int i=0; i<jt->wr_idx; i++ )
     {
         //count same TDI seq in buffer
@@ -1003,20 +674,20 @@ unsigned int ftdi_blaster::write_jtag_stream_as( struct jtag_task* jt )
             port_val |= 0x02;
 
         //each set/reset bit in PIO requires few FTDI commands
-        sbuf_[dwNumBytesToSend++] = 0x80;
-        sbuf_[dwNumBytesToSend++] = port_val;
-        sbuf_[dwNumBytesToSend++] = 0xCB; //direction
+        sbuf_[dw_num_bytes_to_send++] = 0x80;
+        sbuf_[dw_num_bytes_to_send++] = port_val;
+        sbuf_[dw_num_bytes_to_send++] = 0xCB; //direction
 
-        sbuf_[dwNumBytesToSend++] = 0x80;
-        sbuf_[dwNumBytesToSend++] = port_val | 0x01; //clk pos edge
-        sbuf_[dwNumBytesToSend++] = 0xCB; //direction
+        sbuf_[dw_num_bytes_to_send++] = 0x80;
+        sbuf_[dw_num_bytes_to_send++] = port_val | 0x01; //clk pos edge
+        sbuf_[dw_num_bytes_to_send++] = 0xCB; //direction
 
         if( jt->need_tdo )
-            sbuf_[dwNumBytesToSend++] = 0x81; //read port bits
+            sbuf_[dw_num_bytes_to_send++] = 0x81; //read port bits
 
-        sbuf_[dwNumBytesToSend++] = 0x80;
-        sbuf_[dwNumBytesToSend++] = port_val; //clk neg edge
-        sbuf_[dwNumBytesToSend++] = 0xCB; //direction
+        sbuf_[dw_num_bytes_to_send++] = 0x80;
+        sbuf_[dw_num_bytes_to_send++] = port_val; //clk neg edge
+        sbuf_[dw_num_bytes_to_send++] = 0xCB; //direction
 
         k++;
         if(k<WR_CHUNK)
@@ -1024,19 +695,19 @@ unsigned int ftdi_blaster::write_jtag_stream_as( struct jtag_task* jt )
         k=0;
 
         if( jt->need_tdo )
-            sbuf_[dwNumBytesToSend++] = 0x87; //force fast reply
+            sbuf_[dw_num_bytes_to_send++] = 0x87; //force fast reply
 
-        write_read_as_buffer(dwNumBytesToSend,WR_CHUNK,j, jt->need_tdo );
+        write_read_as_buffer(dw_num_bytes_to_send,WR_CHUNK,j, jt->need_tdo );
         j+=WR_CHUNK;
-        dwNumBytesToSend=0;
+        dw_num_bytes_to_send=0;
     }
 
     if(k)
     {
         if( jt->need_tdo )
-            sbuf_[dwNumBytesToSend++] = 0x87; //force fast reply
+            sbuf_[dw_num_bytes_to_send++] = 0x87; //force fast reply
 
-        write_read_as_buffer(dwNumBytesToSend,k,j, jt->need_tdo );
+        write_read_as_buffer(dw_num_bytes_to_send,k,j, jt->need_tdo );
         j+=k;
     }
 
@@ -1051,7 +722,7 @@ unsigned int ftdi_blaster::write_jtag_stream_as( struct jtag_task* jt )
 
 unsigned int ftdi_blaster::write_jtag_stream( struct jtag_task* jt )
 {
-    printTdiTms(jt->data, jt->wr_idx);
+    print_tdi_tms(jt->data, jt->wr_idx);
 
     unsigned int j,k,wr_idx;
     char tdi;
@@ -1163,7 +834,7 @@ unsigned int ftdi_blaster::write_jtag_stream( struct jtag_task* jt )
 
             //send to chip
             dwNumBytesSent=0;
-            ftStatus = g_pWrite(ftHandle_, sbuf_, wr_idx, &dwNumBytesSent);
+            ftStatus = g_pWrite(m_ftHandle, sbuf_, wr_idx, &dwNumBytesSent);
             if(ftStatus)
             { printd("FT_Write err %08X\n",ftStatus); return 0; }
 
@@ -1195,7 +866,7 @@ unsigned int ftdi_blaster::write_jtag_stream( struct jtag_task* jt )
 
     //send to chip
     dwNumBytesSent=0;
-    ftStatus = g_pWrite(ftHandle_, sbuf_, wr_idx, &dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, sbuf_, wr_idx, &dwNumBytesSent);
     if(ftStatus)
     { printd("FT_Write err %08X\n",ftStatus); return 0; }
 
@@ -1219,25 +890,11 @@ unsigned int ftdi_blaster::write_jtag_stream( struct jtag_task* jt )
 
 unsigned int ftdi_blaster::write_flags_read_status(unsigned int flags, unsigned int* pstatus)
 {
-    unsigned int dwNumBytesToSend, dwNumBytesToRead;
+    unsigned int dw_num_bytes_to_send, dwNumBytesToRead;
     unsigned int dwNumBytesSent;
     unsigned char byOutputBuffer[16];
     unsigned char wrflags, blaster_status, s;
     FT_STATUS ftStatus;
-
-    /*
-      if (curr_idx_) {
-      if (last_bits_flags_org_ == 0x13) {
-      mode_as_ = 1; //remember mode
-      write_jtag_stream_as(0, curr_idx_, 1); //active serial
-      }
-      else {
-      flush_passive_serial();
-      //write_jtag_stream(pblaster, 0, curr_idx_, 0); //jtag mode but no jtagsrv reply
-      }
-      curr_idx_ = 0;
-      }
-    */
         
     send_recv(0);
 
@@ -1270,7 +927,7 @@ unsigned int ftdi_blaster::write_flags_read_status(unsigned int flags, unsigned 
     last_bits_flags_ = wrflags;
     last_bits_flags_org_ = flags;
 
-    dwNumBytesToSend = 0;
+    dw_num_bytes_to_send = 0;
     dwNumBytesSent = 0;
     // Set initial states of the MPSSE interface - low byte, both pin directions and output values
     // Pin name Signal Direction Config Initial State Config
@@ -1283,20 +940,20 @@ unsigned int ftdi_blaster::write_flags_read_status(unsigned int flags, unsigned 
     // ADBUS6 nCE output 1 0
     // ADBUS7 nCS output 1 0
     // Set data bits low-byte of MPSSE port
-    byOutputBuffer[dwNumBytesToSend++] = 0x80;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x80;
     // Initial state config above
-    byOutputBuffer[dwNumBytesToSend++] = wrflags;
+    byOutputBuffer[dw_num_bytes_to_send++] = wrflags;
     // Direction config above
-    byOutputBuffer[dwNumBytesToSend++] = 0xcB;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0xcB;
     // force read status
-    byOutputBuffer[dwNumBytesToSend++] = 0x81;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x81;
 
     //complete wr buffer with fast reply command
-    byOutputBuffer[dwNumBytesToSend++] = 0x87;
+    byOutputBuffer[dw_num_bytes_to_send++] = 0x87;
 
-    ftStatus = g_pWrite(ftHandle_, byOutputBuffer, dwNumBytesToSend, &dwNumBytesSent);
-    if ((ftStatus != FT_OK) || (dwNumBytesSent != dwNumBytesToSend)) {
-        printd("hwproc_write_flags_read_status ft_write ERROR %08X %d %d\n", ftStatus, dwNumBytesToSend, dwNumBytesSent);
+    ftStatus = g_pWrite(m_ftHandle, byOutputBuffer, dw_num_bytes_to_send, &dwNumBytesSent);
+    if ((ftStatus != FT_OK) || (dwNumBytesSent != dw_num_bytes_to_send)) {
+        printd("hwproc_write_flags_read_status ft_write ERROR %08X %d %d\n", ftStatus, dw_num_bytes_to_send, dwNumBytesSent);
         return ftStatus; //error
     }
 
@@ -1306,7 +963,7 @@ unsigned int ftdi_blaster::write_flags_read_status(unsigned int flags, unsigned 
 
     //read status bits from programmer
     dwNumBytesToRead = 0;
-    ftStatus = g_pRead(ftHandle_, &blaster_status, 1, &dwNumBytesToRead);
+    ftStatus = g_pRead(m_ftHandle, &blaster_status, 1, &dwNumBytesToRead);
     if ((ftStatus != FT_OK) || (dwNumBytesToRead != 1)) {
         printd("hwproc_write_flags_read_status ft_read ERROR %08X %d\n", ftStatus, dwNumBytesToRead);
         return ftStatus; //error

@@ -3,13 +3,14 @@
 #else
 #endif
 #include "CConfig.h"
+#include "debug.h"
 
 CConfig g_cfg;
 
 CConfig::CConfig()
 {
     // setup defaults
-    m_parameter_value["JtagClock"] = 10000000;
+    m_parameter_value["JtagClock"] = 15000000;
     //m_parameter_value["JtagClockAutoAdjust"] = 0;
 }
 
@@ -29,11 +30,14 @@ unsigned int CConfig::set_value(std::string key, unsigned int value)
 
 unsigned int CConfig::get_value(std::string key, unsigned int* value)
 {
+    printd("get_value %s\n", key.c_str());
     if (m_parameter_value.find(key) == m_parameter_value.end())
     {
+        printd("*** key not found\n");
         return 1;
     }
     *value = m_parameter_value[key];
+    printd("  value = %d\n", *value);
     return 0;
 }
 
