@@ -74,7 +74,7 @@ int is_bittware_card(FT_DEVICE_LIST_INFO_NODE* device_node)
         // Bittware Card
         // needs channel A
         if (descr.back() == 'A')
-             return 1;
+            return 1;
     }
     return 0;
 }
@@ -113,6 +113,8 @@ ftdi_blaster::ftdi_blaster( int idx ):jblaster(idx)
         printd("Open Failed with error %d\n", ftStatus);
         throw;
     }
+    std::string serial = std::string(g_device_node[local_id].SerialNumber);
+    set_config_value((char*)"SerialNumber", std::stoi(serial.substr(2)));
 };
 
 ftdi_blaster::~ftdi_blaster()
@@ -461,13 +463,13 @@ unsigned int ftdi_blaster::read_pass_jtagsrv(unsigned int num_bytes, unsigned ch
 unsigned int ftdi_blaster::set_config_value(char* key, unsigned int value)
 {
     printd("set_config_value %s = %d\n", key, value);
-    return g_cfg.set_value(std::string(key), value);
+    return m_cfg.set_value(std::string(key), value);
 }
 
 unsigned int ftdi_blaster::get_config_value(const char* key, unsigned int* value)
 {
     printd("get_config_value %s\n", key);
-    return g_cfg.get_value(std::string(key), value);
+    return m_cfg.get_value(std::string(key), value);
 }
 
 jblaster* create_blaster(int idx)
@@ -487,7 +489,7 @@ int ftdi_blaster::configure()
         return 0;
     }
     unsigned int freq;
-    if (g_cfg.get_value("JtagClock", &freq) == 0)
+    if (m_cfg.get_value("JtagClock", &freq) == 0)
     {
         if ((freq < 1000) || (freq > 30000000))
             freq = 10000000;

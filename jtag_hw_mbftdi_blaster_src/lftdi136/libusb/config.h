@@ -94,6 +94,9 @@
 #define OS_LINUX 1
 #endif /* _OSX */
 
+/* Haiku backend */
+/* #undef OS_HAIKU */
+
 /* NetBSD backend */
 /* #undef OS_NETBSD */
 
@@ -113,7 +116,7 @@
 #define PACKAGE_NAME "libusb"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libusb 1.0.18"
+#define PACKAGE_STRING "libusb 1.0.20"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libusb"
@@ -122,7 +125,7 @@
 #define PACKAGE_URL "http://libusb.info"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.0.18"
+#define PACKAGE_VERSION "1.0.20"
 
 /* type of second poll() argument */
 #define POLL_NFDS_TYPE nfds_t
@@ -149,21 +152,25 @@
 /* #undef USE_UDEV */
 
 /* Version number of package */
-#define VERSION "1.0.18"
+#define VERSION "1.0.22"
+#define LIBUSB_DEBUG 4
+
+/* Oldest Windows version supported */
+/* #undef WINVER */
 
 /* Use GNU extensions */
 #define _GNU_SOURCE 1
-
-/* Building on Mac OS 10.6.8 reveals darwin_usb.c omits to include inttypes */
-#ifndef PRIx64
-#include <inttypes.h>
-#endif /* PRIx64 */
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
 #ifndef __cplusplus
 /* #undef inline */
 #endif
+
+/* Building on Mac OS 10.6.8 reveals darwin_usb.c omits to include inttypes */
+#ifndef PRIx64
+#include <inttypes.h>
+#endif /* PRIx64 */
 
 #ifdef FORTIFY
 /* Fortify (memory checking tool) enabled so all sources must include

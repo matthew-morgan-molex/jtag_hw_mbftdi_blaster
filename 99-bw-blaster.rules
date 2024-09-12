@@ -1,0 +1,4 @@
+SUBSYSTEMS=="usb", ENV{.LOCAL_ifNum}="$attr{bInterfaceNumber}"
+ACTION=="add", SUBSYSTEMS=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6011", ATTRS{manufacturer}=="BittWare", ATTRS{product}=="S7tVG6", ENV{.LOCAL_ifNum}=="01", RUN+="/bin/sh -c 'echo $kernel > /sys/bus/usb/drivers/ftdi_sio/unbind'"
+
+ACTION=="add", SUBSYSTEMS=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6011", ATTRS{manufacturer}=="BittWare", ATTRS{serial}=="BW*", ENV{.LOCAL_ifNum}=="00", RUN+="/bin/sh -c 'echo $kernel > /sys/bus/usb/drivers/ftdi_sio/unbind'"

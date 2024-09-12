@@ -1,5 +1,57 @@
 libftd2xx Release Notes
 
+1.4.27
+Add x86_32 support
+
+1.4.26
+Add arm64e support for mac
+
+1.4.25
+ARMv6l hard-float Support included, using ArchLinux ARM Cross compiler.
+
+1.4.24
+Support FT232HP, FT233HP, FT2232HP, FT2233HP, FT4232HP, FT4233HP, FT2232HA and
+FT4232HA devices. Correct length of product description for multi-interface
+devices. Add builds for Mac OS X using Apple M1 Silicon.
+
+1.4.22
+Improve response time to fast back-to-back FT_Read operations when data is
+available and buffered. Improve on fix introduced in 1.4.20.
+
+1.4.20
+Fix issue with possible timeout occurring when reading fast bursts of data.
+
+1.4.16
+Fix issue with occasional data loss on very first packet from device when 
+repeatedly opening and closing driver.
+Update libusb to 1.0.22.
+
+1.4.10
+Implement functionality for FT_StopInTask and FT_RestartInTask.
+
+1.4.8
+Fix issue where ports opened within the same process do not show reliably in 
+the FT_CreateDeviceInfoList.
+
+1.4.6
+Add ARM V8 build.
+
+1.4.4
+Reduce time taken to peform an FT_CreateDeviceInfoList.
+Small performance gains on FT_read.
+
+1.4.2
+Rename constructor and destructor to avoid conflict with MySQL.
+Minor updates to ftd2xx.h to match Windows version.
+
+1.4.0
+Update libusb from 1.0.18 to 1.0.20.
+Remove lib_table method for specifying custom VID+PIDs.
+
+1.3.7
+Allow FT_SetVIDPID to be called multiple times (no need to save and restore).
+The LibTable method still works but will be removed soon.
+
 1.3.6
 Release to web as platform-specific tgz packages.
 

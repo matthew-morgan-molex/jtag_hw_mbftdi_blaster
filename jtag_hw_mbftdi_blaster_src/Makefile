@@ -12,7 +12,7 @@ CFLAGS += -I$(INCPATH)
 CFLAGS += -I$(PWD)/../common
 CFLAGS += -DX64 -O3 -g
 CFLAGS += -fPIC -Wall -Werror
-CFLAGS += -DDBGPRINT=1
+#CFLAGS += -DDBGPRINT=1
 CFLAGS += -std=c++11
 
 FTDI_APP = libjtag_hw_mbftdi-blaster.so

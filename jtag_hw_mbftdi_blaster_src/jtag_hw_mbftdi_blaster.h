@@ -60,4 +60,5 @@ private:
     unsigned char rbufn_[RW_BUF_SIZE];
     char* tdi_{ nullptr };
     char* tms_{ nullptr };
+    CConfig m_cfg;
 };
