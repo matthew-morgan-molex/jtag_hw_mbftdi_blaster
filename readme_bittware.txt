@@ -30,3 +30,8 @@ $ cp libjtag_hw_mbftdi-blaster.so /quartus/linux64/
 
 NOTE: /quaruts/linux64/ is an example. Copy the file to the linux64
 dir in your quartus install area.
+
+- After copying make the .so permissions the same as all the other
+  libjtag*.so library files.
+
+$ chmod 755 /quartus/linux64/libjtag_hw_mbftdi-blaster.so
