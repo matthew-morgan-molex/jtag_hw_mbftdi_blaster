@@ -21,6 +21,9 @@
     
   $ python eeprom/ftdi_config.py --card-type IA-860M --serial 12345 ftdi://ftdi:4232:5:2/1
 
+  NOTE: After programming the EEPROM you may have to power cycle the
+        card for the EEPROM setting to take effect.
+
 4) copy udev file
 
   $ sudo cp 99-bw-blaster.rules /etc/udev/rules.d
