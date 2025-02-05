@@ -9,7 +9,7 @@
 CConfig::CConfig()
 {
     // setup defaults
-    m_parameter_value["JtagClock"] = 15000000;
+    m_parameter_value["JtagClock"] = 10000000;
     m_parameter_value["SerialNumber"] = 0;
     //m_parameter_value["JtagClockAutoAdjust"] = 0;
 }

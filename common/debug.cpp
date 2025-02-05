@@ -11,7 +11,7 @@
 #ifdef _WINDOWS
 #define LOG_FILE_NAME "d:\\common\\jtag\\jtag_hw_logfile.txt"
 #else
-#define LOG_FILE_NAME "/home/mmorgan01/jtag_logfile.txt"
+#define LOG_FILE_NAME "/home/mfg-test/jtag_logfile.txt"
 #endif
 
 #if DBGPRINT
