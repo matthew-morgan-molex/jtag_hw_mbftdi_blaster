@@ -17,6 +17,7 @@ void do_sleep(int ms) { usleep(ms*1000); }
 #include "jtagsrv.h"
 #include "CConfig.h"
 #include "jtag_hw_mbftdi_blaster.h"
+#include "usb_detach.h"
 
 //use static linking in Linux
 #define g_pOpen FT_Open
@@ -59,7 +60,8 @@ int is_bittware_card(FT_DEVICE_LIST_INFO_NODE* device_node)
 
     serial = std::string(device_node->SerialNumber);
     descr = std::string(device_node->Description);
-    printd("serial %s, desc %s\n", serial.c_str(), descr.c_str());
+    printd("serial %s, desc %s, loc_id %d\n", serial.c_str(), descr.c_str(),
+        device_node->LocId);
  
     if ((serial.substr(0, 4) == std::string("ACVP")) ||
         (serial.substr(0, 3) == std::string("KCB")))
@@ -164,6 +166,9 @@ int search_blasters(int port_num, char* pblaster_name, int blaster_name_sz)
     unsigned int myNumDevs = 0;
     FT_STATUS ftStatus;
 
+    // first detach from ftdi_sio
+    usb_detach_ftdi_sio();
+    
     // Does an FTDI device exist?
     // Get the number of FTDI devices
     printd("Checking for FTDI devices...\n");

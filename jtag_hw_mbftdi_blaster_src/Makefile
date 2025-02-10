@@ -22,8 +22,8 @@ all: $(FTDI_APP) $(NET_APP)
 ftdi: $(FTDI_APP)
 net: $(NET_APP)
 
-$(FTDI_APP): jtag_hw_mbftdi_blaster.cpp jtag_hw_blaster.cpp CConfig.cpp
-	$(CPP) -shared -o $(FTDI_APP) -static-libstdc++ $(CFLAGS) jtag_hw_mbftdi_blaster.cpp  jtag_hw_blaster.cpp CConfig.cpp $(LIBPATH)/libftd2xx.a ../common/debug.cpp -Wl,-no-whole-archive
+$(FTDI_APP): jtag_hw_mbftdi_blaster.cpp jtag_hw_blaster.cpp CConfig.cpp usb_detach.cpp
+	$(CPP) -shared -o $(FTDI_APP) -static-libstdc++ -static-libgcc  $(CFLAGS) jtag_hw_mbftdi_blaster.cpp  jtag_hw_blaster.cpp CConfig.cpp usb_detach.cpp $(LIBPATH)/libftd2xx.a ../common/debug.cpp -Wl,-no-whole-archive -lusb-1.0
 
 $(NET_APP): jtag_hw_net_blaster.cpp jtag_hw_blaster.cpp CConfig.cpp socket.cpp
 	$(CPP) -shared -o $(NET_APP) -static-libstdc++ -rdynamic $(CFLAGS) -DDBGPRINT=1 jtag_hw_net_blaster.cpp  jtag_hw_blaster.cpp CConfig.cpp socket.cpp ../common/debug.cpp -Wl,-no-whole-archive
