@@ -64,7 +64,9 @@ int is_bittware_card(FT_DEVICE_LIST_INFO_NODE* device_node)
         device_node->LocId);
  
     if ((serial.substr(0, 4) == std::string("ACVP")) ||
-        (serial.substr(0, 3) == std::string("KCB")))
+        (serial.substr(0, 3) == std::string("KCB")) ||
+        (serial.substr(0, 3) == std::string("VPB")) ||
+        (serial.substr(0, 3) == std::string("VPK")))
     {
         // Achronix Card
         // needs channel B
@@ -120,7 +122,9 @@ ftdi_blaster::ftdi_blaster( int idx ):jblaster(idx)
     printd("serial number = %s\n", serial.c_str());
     if (serial.substr(0, 4) == std::string("ACVP"))
         set_config_value((char*)"SerialNumber", std::stoi(serial.substr(4)));
-    else if (serial.substr(0, 3) == std::string("KCB"))
+    else if ((serial.substr(0, 3) == std::string("KCB")) ||
+             (serial.substr(0, 3) == std::string("VPB")) ||
+             (serial.substr(0, 3) == std::string("VPK")))
         set_config_value((char*)"SerialNumber", std::stoi(serial.substr(3)));
     else
 	set_config_value((char*)"SerialNumber", std::stoi(serial.substr(2)));
