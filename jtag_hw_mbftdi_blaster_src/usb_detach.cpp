@@ -53,7 +53,9 @@ void usb_detach_ftdi_sio(void)
             }
             serial_str = std::string((char*)serial_number);
             if ((serial_str.substr(0, 4) == std::string("ACVP")) ||
-                (serial_str.substr(0, 3) == std::string("KCB")))
+                (serial_str.substr(0, 3) == std::string("KCB")) ||
+                (serial_str.substr(0, 3) == std::string("VPB")) ||
+                (serial_str.substr(0, 3) == std::string("VPK")))
             {
                 printd("do detach %s\n", serial_str.c_str());
                 result = libusb_detach_kernel_driver(handle, 1);
